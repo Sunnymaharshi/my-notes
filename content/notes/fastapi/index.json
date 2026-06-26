@@ -1,0 +1,376 @@
+{
+  "id": "fastapi",
+  "title": "FastAPI",
+  "category": "python",
+  "labels": ["fastapi", "async", "asgi", "sqlalchemy", "pydantic", "auth", "redis", "performance"],
+  "summary": "Python web framework for building modern APIs — async-first, built on Starlette + Pydantic.",
+  "difficulty": "intermediate",
+  "related": ["event-loop"],
+  "updated": "2026-06-26",
+  "draft": false,
+  "body": [
+    {
+      "type": "outline",
+      "text": "Overview",
+      "children": [
+        { "type": "outline", "text": "Python web framework for building modern APIs" },
+        { "type": "outline", "text": "Built on Starlette (ASGI) + Uvicorn, with Pydantic for data" }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Features",
+      "children": [
+        {
+          "type": "outline",
+          "text": "Speed & performance",
+          "children": [
+            { "type": "outline", "text": "Asynchronous support with async/await syntax" },
+            { "type": "outline", "text": "Built on top of Starlette and Pydantic" }
+          ]
+        },
+        { "type": "outline", "text": "Automatic data validation and serialization", "note": "uses Pydantic" },
+        { "type": "outline", "text": "Automatic interactive API documentation", "note": "Swagger UI and ReDoc" },
+        { "type": "outline", "text": "Dependency Injection system for easy management of components and logic" },
+        { "type": "outline", "text": "Security utilities — built-in support for authentication and authorization" },
+        { "type": "outline", "text": "Good developer experience — minimal boilerplate, clear errors, easy to test" },
+        { "type": "outline", "text": "WebSockets & streaming support" }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Async, await & concurrency",
+      "children": [
+        {
+          "type": "outline",
+          "text": "async, await & event loop",
+          "children": [
+            { "type": "outline", "text": "Concurrency without threads — single thread, event-loop based" },
+            { "type": "outline", "text": "async def creates a coroutine; await suspends it so the loop runs other tasks while waiting for I/O" },
+            { "type": "outline", "text": "FastAPI is built on Starlette + Uvicorn (ASGI) — same idea as Express + Node's libuv" },
+            {
+              "type": "code",
+              "lang": "python",
+              "code": "# CPU-bound: use regular def (FastAPI runs it in a thread pool)\n@app.get(\"/sync\")\ndef sync_route():\n    return heavy_cpu_task()\n\n# I/O-bound: use async def (runs in the event loop)\n@app.get(\"/async\")\nasync def async_route():\n    result = await db.fetch_one(query)\n    return result\n\n# Pitfall: a blocking sync call inside async freezes the whole server\nasync def bad():\n    time.sleep(2)            # blocks event loop\n    await asyncio.sleep(2)   # yields control"
+            },
+            { "type": "callout", "variant": "tip", "text": "If a function does I/O, make it async def and await it. If it's CPU-heavy (image processing, crypto), keep it plain def — FastAPI pushes it to a thread pool automatically." }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Event Loop",
+          "children": [
+            { "type": "outline", "text": "Python's asyncio event loop is single-threaded and cooperative — same model as Node" },
+            { "type": "outline", "text": "Maintains a queue of coroutines; runs one until it hits an await on something not ready, then parks it and runs the next" },
+            { "type": "outline", "text": "When the awaited operation completes, the coroutine re-enters the queue to resume" },
+            { "type": "callout", "variant": "gotcha", "text": "A coroutine must voluntarily yield via await. A single time.sleep(2) inside an async route freezes every request on that worker for 2 full seconds." }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Thread pool",
+          "children": [
+            { "type": "outline", "text": "Plain def routes don't run on the event loop — Starlette dispatches them via anyio.to_thread.run_sync() to a worker thread (default cap 40)" },
+            { "type": "outline", "text": "The event loop kicks off the dispatch (near-instant) and goes back to other requests; the blocking happens in a thread, not on the loop" }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Python's GIL (Global Interpreter Lock)",
+          "children": [
+            { "type": "outline", "text": "Only one thread executes Python bytecode at a time, even with multiple threads" },
+            { "type": "outline", "text": "So the thread pool gives parallel waiting, not parallel computation" },
+            { "type": "outline", "text": "Most blocking calls (network/file I/O, time.sleep) release the GIL while waiting, so other threads progress" },
+            { "type": "outline", "text": "For genuinely CPU-heavy work, reach for multiprocessing, a separate worker process, or an offline job (Celery/ARQ)" }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Practical decision tree",
+          "children": [
+            { "type": "outline", "text": "I/O + an async-native library exists → async def + await (asyncpg, httpx.AsyncClient, aioredis)" },
+            { "type": "outline", "text": "I/O but only a sync library → keep the route plain def; let FastAPI offload to the thread pool (don't call the sync lib from async def)" },
+            { "type": "outline", "text": "Pure CPU-bound → plain def is usually fine; if heavy and frequent, use a separate worker process" },
+            { "type": "outline", "text": "One Uvicorn worker = one event loop + one thread pool; run multiple workers (Gunicorn/Uvicorn --workers N) to scale across cores" }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Lifespan events",
+          "children": [
+            { "type": "outline", "text": "Initialize and clean up app-level resources (DB pool, ML model, Redis) once on startup and once on shutdown" },
+            {
+              "type": "code",
+              "lang": "python",
+              "code": "@asynccontextmanager\nasync def lifespan(app: FastAPI):\n    # --- Startup ---\n    app.state.db_pool = await create_pool(DATABASE_URL)\n    app.state.redis = await aioredis.create_redis_pool(REDIS_URL)\n    yield  # App runs here\n    # --- Shutdown ---\n    await app.state.db_pool.close()\n    await app.state.redis.close()\n\napp = FastAPI(lifespan=lifespan)"
+            },
+            { "type": "outline", "text": "Store shared resources on app.state; access via request.app.state.db_pool or inject as a dependency" }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "async vs normal functions",
+          "children": [
+            { "type": "outline", "text": "By default routes run in separate threads; an async function is handled in the same thread and won't block other requests while waiting on I/O" },
+            { "type": "outline", "text": "Async needs supported drivers: asyncpg (PostgreSQL), aiomysql (MySQL); sessionmaker/create_engine also change for async" },
+            { "type": "outline", "text": "App init changes too — lifespan creates tables and disposes the engine on shutdown" },
+            { "type": "outline", "text": "Relationship queries need eager loading (e.g. selectinload) to avoid multiple queries" }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Async SQLAlchemy + asyncpg",
+          "children": [
+            { "type": "outline", "text": "Regular SQLAlchemy blocks the event loop — db.query() is synchronous" },
+            { "type": "outline", "text": "Use SQLAlchemy 2.0 async mode with the asyncpg driver for non-blocking queries" },
+            { "type": "callout", "variant": "gotcha", "text": "N+1 trap: lazy loading doesn't work in async mode. Use selectinload() or joinedload() to eagerly load relationships in one query." }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Routing & requests",
+      "children": [
+        { "type": "outline", "text": "FastAPI() — initialize the app" },
+        { "type": "outline", "text": "Body() — returns data sent through the body; only for POST, PUT, PATCH" },
+        {
+          "type": "outline",
+          "text": "GET request",
+          "children": [
+            { "type": "outline", "text": "Decorator for the GET method on a path; add a success status code if you want" },
+            { "type": "code", "lang": "python", "code": "@app.get(\"/home\", status_code=status.HTTP_200_OK)\ndef home():\n    return {\"message\": \"Welcome to FastAPI!\"}" }
+          ]
+        },
+        { "type": "callout", "variant": "warning", "text": "Order matters — define static paths before dynamic ones." },
+        {
+          "type": "outline",
+          "text": "POST request",
+          "children": [
+            { "type": "outline", "text": "Create data; body data is passed to the argument" },
+            { "type": "code", "lang": "python", "code": "@app.post(\"/create\")\ndef create_book(new_book=Body()):\n    ..." }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Path parameters (dynamic paths)",
+          "children": [
+            { "type": "outline", "text": "@app.get(\"/product/{id}\") — id is passed to the function; variable names must match" }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Query parameters",
+          "children": [
+            { "type": "outline", "text": "Same key name must be a function argument, e.g. /result/{id}/?page=1 → func(id, page)" }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Middleware",
+          "children": [
+            { "type": "outline", "text": "Wraps every request — CORS, logging, rate limiting, request IDs, timing" },
+            { "type": "code", "lang": "python", "code": "@app.middleware(\"http\")\nasync def add_timing_header(request: Request, call_next):\n    start = time.time()\n    response = await call_next(request)   # call_next = next()\n    response.headers[\"X-Process-Time\"] = str(time.time() - start)\n    return response" }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Exception handling",
+          "children": [
+            { "type": "outline", "text": "@app.exception_handler(ExceptionType) — handle exceptions globally, e.g. RequestValidationError" },
+            { "type": "outline", "text": "HTTPException", "note": "raise HTTPException(status_code=404, detail='Item not Found')" }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Background Tasks",
+          "children": [
+            { "type": "outline", "text": "Fire-and-forget work after the response is sent — emails, analytics, webhooks; runs in the same process" },
+            { "type": "code", "lang": "python", "code": "from fastapi import BackgroundTasks\n\n@app.post(\"/users\")\nasync def create_user(user: UserCreate, background_tasks: BackgroundTasks):\n    new_user = await db.create(user)\n    # Scheduled — doesn't block the response\n    background_tasks.add_task(send_welcome_email, new_user.email)\n    return new_user  # returns immediately" },
+            { "type": "callout", "variant": "warning", "text": "Don't use BackgroundTasks for work over a few seconds, anything needing retries, or tasks that must survive a crash — use Celery + Redis." }
+          ]
+        },
+        { "type": "outline", "text": "Celery — more complex background task management and scheduling" },
+        {
+          "type": "outline",
+          "text": "APIRouter",
+          "children": [
+            { "type": "outline", "text": "Split routes into files; use router instead of app in route files, then app.include_router(auth_router)" }
+          ]
+        },
+        { "type": "outline", "text": "StaticFiles", "note": "app.mount(\"/static\", StaticFiles(directory=\"static\"), name=\"static\")" },
+        {
+          "type": "outline",
+          "text": "Jinja2Templates",
+          "children": [
+            { "type": "outline", "text": "Render HTML templates: templates.TemplateResponse(\"home.html\", {\"request\": request, \"title\": \"Home\"})" },
+            { "type": "outline", "text": "if/else, for loops, block (override in child templates), extends (inherit a base), url_for (build URLs for static/routes)" }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Starlette",
+          "children": [
+            { "type": "outline", "text": "ASGI framework FastAPI is built on — routing, middleware, background tasks" },
+            { "type": "outline", "text": "Non-existing routes raise StarletteHTTPException, which you can catch and handle" }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Pydantic & validation",
+      "children": [
+        {
+          "type": "outline",
+          "text": "Pydantic",
+          "children": [
+            { "type": "outline", "text": "Data modeling, parsing and error handling; type validation at runtime with clear messages" },
+            { "type": "outline", "text": "BaseModel — data model classes extend it" },
+            { "type": "outline", "text": "response_model — specify a route's response model" },
+            { "type": "outline", "text": "Field — validation rules and metadata for fields" },
+            { "type": "outline", "text": "ConfigDict — configure model behavior; from_attributes populates fields from object attributes (useful with ORMs)" },
+            { "type": "code", "lang": "python", "code": "title: str = Field(min_length=2, max_length=100)\nmodel_config = ConfigDict(from_attributes=True)\n\n@app.get(\"/posts\", response_model=list[PostResponse])\ndef list_posts():\n    ..." }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Validation helpers",
+          "children": [
+            { "type": "outline", "text": "Path — path param validation", "note": "func(book_id: int = Path(gt=0))" },
+            { "type": "outline", "text": "Query — query param validation", "note": "func(rating: int = Query(gt=0, lt=6))" }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Type hints & Annotated",
+          "children": [
+            { "type": "outline", "text": "Type hints are metadata on variables/params; Python doesn't enforce them at runtime" },
+            { "type": "outline", "text": "Annotated = type + extra metadata; FastAPI reads it to know e.g. 'this is a query param' or 'validate >= 0'" },
+            { "type": "code", "lang": "python", "code": "def list_items(skip: Annotated[int, Query(ge=0)]):\n    ..." }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Status codes",
+      "children": [
+        {
+          "type": "table",
+          "headers": ["Range", "Meaning", "Example"],
+          "rows": [
+            ["1xx", "Informational", "Request processing"],
+            ["2xx", "Success", "Request completed successfully"],
+            ["3xx", "Redirection", "Further action required"],
+            ["4xx", "Client error", "Caused by the client"],
+            ["5xx", "Server error", "Caused by the server"]
+          ]
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Dependency injection",
+      "children": [
+        {
+          "type": "outline",
+          "text": "Depends()",
+          "children": [
+            { "type": "outline", "text": "Declare a function as a dependency; FastAPI calls it before your route and passes the result in" },
+            { "type": "outline", "text": "Used to share DB sessions, current user, config, rate limiters, caches" },
+            { "type": "code", "lang": "python", "code": "def get_current_user(\n    token: Annotated[str, Depends(get_token)],\n    db: Annotated[Session, Depends(get_db)],\n):\n    ..." },
+            { "type": "outline", "text": "FastAPI builds a dependency graph and resolves everything before the route; two routes that Depends(get_db) each get their own session per request" }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Database — SQLAlchemy",
+      "children": [
+        {
+          "type": "outline",
+          "text": "Engine, session & base",
+          "children": [
+            { "type": "outline", "text": "create_engine — create a SQLAlchemy engine for the DB connection" },
+            { "type": "outline", "text": "sessionmaker — session factory for managing DB sessions" },
+            { "type": "outline", "text": "DeclarativeBase — base class for models" },
+            { "type": "outline", "text": "get_db — create a session and yield it for use in route handlers" },
+            { "type": "outline", "text": "db dependency injection — inject a session into a handler", "note": "def create_user(user: UserCreate, db: Annotated[Session, Depends(get_db)])" }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Models & Base",
+          "children": [
+            { "type": "code", "lang": "python", "code": "class Base(DeclarativeBase):\n    pass\n\nclass User(Base):\n    __tablename__ = \"users\"\n    id: Mapped[int]          = mapped_column(primary_key=True)\n    email: Mapped[str]       = mapped_column(String(255), unique=True, index=True)\n    name: Mapped[str | None] = mapped_column(String(100))\n    posts: Mapped[list[\"Post\"]] = relationship(back_populates=\"author\", lazy=\"select\")" }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Relationships",
+          "children": [
+            { "type": "outline", "text": "One-to-many: cascade=\"all, delete-orphan\" — deleting a user deletes all their posts" },
+            { "type": "outline", "text": "One-to-one: relationship(..., uselist=False)" },
+            { "type": "code", "lang": "python", "code": "# Many-to-many via an association table\ntags: Mapped[list[\"Tag\"]] = relationship(\n    \"Tag\", secondary=post_tags, back_populates=\"posts\"\n)" }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Lazy loading strategies",
+          "children": [
+            { "type": "outline", "text": "lazy=\"select\" (default) — separate SELECT on first access; easy but causes N+1" },
+            { "type": "outline", "text": "lazy=\"joined\" — LEFT OUTER JOIN in one query; best for small related sets always loaded" },
+            { "type": "outline", "text": "lazy=\"subquery\" — one extra subquery per collection; good for large collections without cartesian explosion" },
+            { "type": "outline", "text": "lazy=\"raise\" — raises on access; enforces explicit eager loading, great for prod safety" },
+            { "type": "callout", "variant": "gotcha", "text": "N+1 is the #1 SQLAlchemy performance killer. Use lazy=\"raise\" in production and explicit selectinload()/joinedload() per query." }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Eager loading",
+          "children": [
+            { "type": "outline", "text": "selectinload — 2 queries, no data duplication; use for collections" },
+            { "type": "outline", "text": "joinedload — 1 query with JOIN; use for to-one (author, profile)" },
+            { "type": "code", "lang": "python", "code": "users = session.scalars(\n    select(User).options(\n        selectinload(User.posts).selectinload(Post.tags)\n    )\n).all()\n\nposts = session.scalars(\n    select(Post).options(\n        joinedload(Post.author),\n        joinedload(Post.category),\n    )\n).unique().all()" }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Engine setup",
+          "children": [
+            { "type": "code", "lang": "python", "code": "engine = create_engine(\n    \"postgresql+psycopg2://user:pass@localhost/mydb\",\n    pool_size=10,          # persistent connections\n    max_overflow=20,       # extra connections allowed\n    pool_pre_ping=True,    # validate connection before use (avoids stale conns)\n    pool_recycle=3600,     # recycle connections every hour\n    echo=False,            # True logs all SQL — dev only\n)\nSessionLocal = sessionmaker(\n    bind=engine, autoflush=False, autocommit=False, expire_on_commit=False\n)" },
+            { "type": "outline", "text": "expire_on_commit=False keeps attribute values accessible after commit without re-querying — important in async/API contexts" }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Authentication",
+      "children": [
+        { "type": "outline", "text": "Password hashing — pwdlib; recommended() returns the most secure algorithm available" },
+        { "type": "outline", "text": "JWT (JSON Web Tokens) — access tokens for authentication" },
+        { "type": "outline", "text": "OAuth2 framework — Swagger auto-generates the login UI; OAuth2PasswordBearer extracts and validates the token" }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Database migrations — Alembic",
+      "children": [
+        { "type": "outline", "text": "Manage schema changes over time, like git for your DB" },
+        { "type": "code", "lang": "bash", "code": "alembic revision --autogenerate -m \"Add new column to users table\"\nalembic upgrade head      # apply pending migrations\nalembic downgrade -1      # roll back the most recent migration\nalembic history          # show migration history" }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Redis Lua scripts",
+      "children": [
+        { "type": "outline", "text": "Execute multiple Redis commands atomically on the server — avoids race conditions and round trips" },
+        { "type": "code", "lang": "lua", "code": "local balance = tonumber(redis.call(\"GET\", KEYS[1]))\nif balance >= tonumber(ARGV[1]) then\n    redis.call(\"DECRBY\", KEYS[1], ARGV[1])\n    return 1\nend\nreturn 0" },
+        { "type": "outline", "text": "Redis guarantees no other client runs commands in the middle — the script completes before anything else executes" }
+      ]
+    }
+  ]
+}

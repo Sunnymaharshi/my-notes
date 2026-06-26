@@ -1,0 +1,9 @@
+[
+  { "id": "python", "label": "Python", "color": "#3776ab", "order": 1 },
+  { "id": "javascript", "label": "JavaScript", "color": "#f7df1e", "order": 2 },
+  { "id": "react", "label": "React", "color": "#61dafb", "order": 3 },
+  { "id": "dsa", "label": "DSA", "color": "#16a34a", "order": 4 },
+  { "id": "devops", "label": "DevOps", "color": "#2496ed", "order": 5 },
+  { "id": "system-design", "label": "System Design", "color": "#a855f7", "order": 6 },
+  { "id": "cloud", "label": "Cloud", "color": "#ff9900", "order": 7 }
+]

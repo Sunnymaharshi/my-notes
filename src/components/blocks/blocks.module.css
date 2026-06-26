@@ -1,0 +1,238 @@
+/* --- outline tree --- */
+.branch {
+  margin: 1px 0;
+}
+
+.branchHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.branchHeader:hover {
+  background: var(--bg-elev);
+}
+
+.caret {
+  display: inline-block;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+
+.children {
+  margin-left: 13px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
+
+.leaf {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 4px 6px 4px 6px;
+}
+
+.bullet {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  margin-top: 8px;
+  flex-shrink: 0;
+}
+
+.note {
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* --- code --- */
+.code {
+  margin: 10px 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0b0f14;
+}
+
+.codeBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+
+.codeLang {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-family: ui-monospace, monospace;
+}
+
+.copyBtn {
+  font-size: 11px;
+  color: var(--text-dim);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.copyBtn:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+.shiki :global(pre.shiki) {
+  margin: 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  background: transparent !important;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.codePlain {
+  margin: 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-size: 13px;
+}
+
+/* --- callout --- */
+.callout {
+  display: flex;
+  gap: 9px;
+  margin: 10px 0;
+  padding: 10px 13px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  background: var(--bg-elev);
+}
+
+.calloutIcon {
+  flex-shrink: 0;
+}
+
+.callout_tip {
+  border-left-color: #2ecc71;
+}
+.callout_warning,
+.callout_gotcha {
+  border-left-color: #e3b341;
+}
+.callout_info {
+  border-left-color: var(--accent);
+}
+.callout_note {
+  border-left-color: var(--text-dim);
+}
+
+/* --- table --- */
+.tableWrap {
+  margin: 10px 0;
+  overflow-x: auto;
+}
+
+.table {
+  border-collapse: collapse;
+  font-size: 14px;
+  width: 100%;
+}
+
+.table th,
+.table td {
+  border: 1px solid var(--border);
+  padding: 7px 12px;
+  text-align: left;
+}
+
+.table th {
+  background: var(--bg-elev);
+  font-weight: 600;
+}
+
+.table tbody tr:hover {
+  background: var(--bg-elev);
+}
+
+/* --- flashcard --- */
+.flashcard {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin: 10px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elev);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.flashcard:hover {
+  border-color: var(--accent);
+}
+
+.flashcardQ {
+  display: flex;
+  gap: 9px;
+  font-weight: 600;
+}
+
+.flashcardA {
+  display: flex;
+  gap: 9px;
+  color: var(--text-dim);
+  padding-top: 9px;
+  margin-top: 9px;
+  border-top: 1px solid var(--border);
+}
+
+.flashcardTag {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  background: rgba(88, 166, 255, 0.12);
+  border-radius: 5px;
+  padding: 1px 7px;
+  height: fit-content;
+}
+
+.flashcardHint {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 7px;
+}
+
+/* --- image --- */
+.figure {
+  margin: 12px 0;
+}
+
+.image {
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.caption {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin-top: 6px;
+}

@@ -1,0 +1,128 @@
+.shell {
+  display: grid;
+  grid-template-columns: 290px 1fr;
+  height: 100vh;
+}
+
+.sidebar {
+  border-right: 1px solid var(--border);
+  background: var(--bg-elev);
+  overflow-y: auto;
+  padding: 16px 14px;
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 4px 8px 18px;
+}
+
+.brand {
+  display: block;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.themeToggle {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.themeToggle:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 18px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.search:hover {
+  border-color: var(--text-dim);
+  color: var(--text);
+}
+
+.searchIcon {
+  font-size: 15px;
+}
+
+.kbd {
+  margin-left: auto;
+  font-family: inherit;
+  font-size: 11px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+
+.group {
+  margin-bottom: 18px;
+}
+
+.groupLabel {
+  display: block;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  padding: 0 8px;
+  margin-bottom: 6px;
+  text-decoration: none;
+}
+
+.groupLabel:hover {
+  color: var(--text);
+}
+
+.noteLink {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.noteLink:hover {
+  background: var(--bg-elev-2);
+}
+
+.active {
+  background: var(--bg-elev-2);
+  color: var(--accent);
+}
+
+.dot {
+  color: #e3b341;
+  font-size: 8px;
+}
+
+.main {
+  overflow-y: auto;
+  padding: 36px 48px 80px;
+}

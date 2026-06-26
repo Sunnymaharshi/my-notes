@@ -1,0 +1,36 @@
+{
+  "name": "my-notes",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "content": "tsx scripts/build-content.ts",
+    "convert": "tsx tools/convert/parse.ts",
+    "dupes": "tsx scripts/dupes.ts",
+    "admin": "vite --config vite.admin.config.ts",
+    "dev": "vite",
+    "prebuild": "npm run content",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "validate": "tsx scripts/build-content.ts --check"
+  },
+  "dependencies": {
+    "cmdk": "^1.1.1",
+    "framer-motion": "^11.18.2",
+    "minisearch": "^7.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.4",
+    "shiki": "^1.29.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

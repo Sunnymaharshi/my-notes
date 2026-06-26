@@ -1,0 +1,199 @@
+/* ---- view switcher (tabs) ---- */
+.switcher {
+  display: inline-flex;
+  gap: 2px;
+  margin-bottom: 16px;
+  padding: 3px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+
+.tab {
+  font-size: 13px;
+  color: var(--text-dim);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tabActive {
+  background: var(--bg-elev-2);
+  color: var(--text);
+}
+
+/* ---- tree view ---- */
+.tree {
+  font-size: 15px;
+}
+
+/* ---- doc view ---- */
+.doc {
+  max-width: 760px;
+  font-size: 15px;
+}
+
+.docSection {
+  margin: 0 0 4px;
+}
+
+.docHeading {
+  margin: 22px 0 8px;
+  letter-spacing: -0.01em;
+  scroll-margin-top: 20px;
+}
+
+.docHeading:first-child {
+  margin-top: 0;
+}
+
+.doc h2.docHeading {
+  font-size: 24px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.doc h3.docHeading {
+  font-size: 19px;
+}
+.doc h4.docHeading,
+.doc h5.docHeading,
+.doc h6.docHeading {
+  font-size: 16px;
+  color: var(--text-dim);
+}
+
+.docList {
+  margin: 6px 0;
+  padding-left: 22px;
+}
+
+.docList li {
+  margin: 3px 0;
+}
+
+.docNote {
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* indent nested sections slightly so structure stays legible */
+.docSection .docSection {
+  margin-left: 14px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
+
+/* ---- flashcard study deck ---- */
+.cardsEmpty {
+  color: var(--text-dim);
+}
+
+.cardsEmpty code {
+  background: var(--bg-elev-2);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.deck {
+  max-width: 640px;
+}
+
+.deckBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.deckProgress {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  min-width: 56px;
+}
+
+.deckTrack {
+  flex: 1;
+  height: 4px;
+  background: var(--bg-elev-2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.deckFill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  min-height: 220px;
+  text-align: left;
+  padding: 22px 24px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.card:hover {
+  border-color: var(--accent);
+}
+
+.cardSide {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.cardText {
+  font-size: 19px;
+  line-height: 1.5;
+}
+
+.cardDerived {
+  margin-top: auto;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.cardHint {
+  margin-top: auto;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.deckNav {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.deckBtn {
+  font-size: 13px;
+  color: var(--text-dim);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.deckBtn:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
