@@ -9,7 +9,7 @@ import note from "../NoteView.module.css";
 import styles from "./views.module.css";
 
 /** Default view: the collapsible outline, with expand/collapse/revision controls. */
-export function TreeView({ note: noteData }: { note: Note }) {
+export function TreeView({ note: noteData, showControls = true }: { note: Note; showControls?: boolean }) {
   const branches = useMemo(() => collectBranchPaths(noteData.body), [noteData]);
   // `collapsed` holds the paths that are closed; everything else is open.
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -61,13 +61,15 @@ export function TreeView({ note: noteData }: { note: Note }) {
 
   return (
     <>
-      <div className={note.controls}>
-        <button onClick={expandAll}>Expand all</button>
-        <button onClick={collapseAll}>Collapse all</button>
-        <button onClick={revision} className={note.revision}>
-          Revision mode
-        </button>
-      </div>
+      {showControls && (
+        <div className={note.controls}>
+          <button onClick={expandAll}>Expand all</button>
+          <button onClick={collapseAll}>Collapse all</button>
+          <button onClick={revision} className={note.revision}>
+            Revision mode
+          </button>
+        </div>
+      )}
 
       <TreeContext.Provider value={tree}>
         <div className={styles.tree}>

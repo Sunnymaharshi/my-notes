@@ -1,18 +1,47 @@
 /**
- * Admin studio shell (PLAN §7). Three panes: note list, editor (envelope + blocks), and a
- * live preview using the real site renderer. Saves validate against the same Zod schema as
- * the build before writing content/notes/<id>/index.json. Local-only; never deployed.
+ * Admin studio shell. Layout: sidebar (note list) | main content area.
+ * Main area: paste notes (top, always visible) + envelope form (bottom).
+ * Saves validate against the same Zod schema as the build.
+ * Local-only; never deployed.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Component, useEffect, useMemo, useState } from "react";
 import type { BlockNode, Category, Domain, Note, NoteMeta } from "../../src/lib/schema.ts";
 import { dupeFlagsForNote, type DupeGroup } from "../../src/lib/dupes.ts";
 import { api, ApiError } from "./api.ts";
 import { EnvelopeForm } from "./EnvelopeForm.tsx";
-import { BlockEditor } from "./BlockEditor.tsx";
-import { Preview } from "./Preview.tsx";
 import { ImportDialog, type InsertTarget } from "./ImportDialog.tsx";
 import { CatalogDialog } from "./CatalogDialog.tsx";
 import { appendChild } from "./tree-ops.ts";
+
+class PreviewErrorBoundary extends Component<
+  { children: React.ReactNode },
+  { error: string | null }
+> {
+  state = { error: null };
+  static getDerivedStateFromError(e: Error) {
+    return { error: e.message };
+  }
+  render() {
+    if (this.state.error)
+      return (
+        <div style={{ padding: "1rem", color: "var(--c-danger, red)", fontFamily: "monospace", fontSize: "0.8rem" }}>
+          Preview error: {this.state.error}
+        </div>
+      );
+    return this.props.children;
+  }
+}
+
+const makeBlank = (cats: Category[]): Note => ({
+  id: "",
+  title: "",
+  category: cats[0]?.id ?? "",
+  labels: [],
+  summary: "",
+  updated: new Date().toISOString().slice(0, 10),
+  draft: true,
+  body: [],
+});
 
 export function App() {
   const [notes, setNotes] = useState<NoteMeta[]>([]);
@@ -24,39 +53,8 @@ export function App() {
   const [original, setOriginal] = useState("");
   const [issues, setIssues] = useState<string[]>([]);
   const [status, setStatus] = useState("");
-  const [importOpen, setImportOpen] = useState(false);
   const [catalogOpen, setCatalogOpen] = useState(false);
-  const [syncScroll, setSyncScroll] = useState(false);
   const [filter, setFilter] = useState("");
-
-  const editScrollRef = useRef<HTMLDivElement>(null);
-  const previewRef = useRef<HTMLElement>(null);
-
-  // Linked scrolling: mirror one pane's scroll position onto the other, proportionally.
-  // A guard flag prevents the programmatic scroll from echoing back into a loop.
-  useEffect(() => {
-    if (!syncScroll) return;
-    const a = editScrollRef.current;
-    const b = previewRef.current;
-    if (!a || !b) return;
-    let locked = false;
-    const mirror = (from: HTMLElement, to: HTMLElement) => {
-      if (locked) return;
-      locked = true;
-      const max = from.scrollHeight - from.clientHeight;
-      const ratio = max > 0 ? from.scrollTop / max : 0;
-      to.scrollTop = ratio * (to.scrollHeight - to.clientHeight);
-      requestAnimationFrame(() => (locked = false));
-    };
-    const onA = () => mirror(a, b);
-    const onB = () => mirror(b, a);
-    a.addEventListener("scroll", onA);
-    b.addEventListener("scroll", onB);
-    return () => {
-      a.removeEventListener("scroll", onA);
-      b.removeEventListener("scroll", onB);
-    };
-  }, [syncScroll, draft]);
 
   const refreshLists = async () => {
     const [n, d] = await Promise.all([api.notes(), api.dupes()]);
@@ -83,6 +81,14 @@ export function App() {
       .catch((e) => setStatus(String(e)));
   }, [selectedId]);
 
+  // Initialize to a blank draft once categories are loaded.
+  useEffect(() => {
+    if (categories.length > 0 && draft === null && selectedId === null) {
+      setDraft(makeBlank(categories));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories]);
+
   const allLabels = useMemo(
     () => [...new Set(notes.flatMap((n) => n.labels))].sort(),
     [notes],
@@ -91,11 +97,16 @@ export function App() {
     () => (draft ? dupeFlagsForNote(draft.id, dupes) : new Map()),
     [draft, dupes],
   );
-  const dirty = draft != null && JSON.stringify(draft) !== original;
+
+  // New (unsaved) notes are "dirty" as soon as they have a title or body; saved notes use JSON diff.
+  const dirty =
+    draft != null &&
+    (selectedId === null
+      ? draft.title.trim() !== "" || draft.body.length > 0
+      : JSON.stringify(draft) !== original);
 
   const patch = (p: Partial<Note>) => setDraft((d) => (d ? { ...d, ...p } : d));
 
-  // Filtered note list for the sidebar (matches title / category / labels, case-insensitive).
   const visibleNotes = useMemo(() => {
     const q = filter.trim().toLowerCase();
     if (!q) return notes;
@@ -104,7 +115,6 @@ export function App() {
     );
   }, [notes, filter]);
 
-  // Top-level sections of the current note — targets for "insert under…" on import.
   const sections = useMemo(
     () =>
       (draft?.body ?? [])
@@ -114,11 +124,9 @@ export function App() {
     [draft],
   );
 
-  // Unsaved-changes guard: confirm before any action that would discard the current edits.
   const confirmDiscard = () =>
     !dirty || window.confirm("Discard unsaved changes to this note?");
 
-  // Warn on a hard browser close/reload while there are unsaved edits.
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       if (dirty) {
@@ -135,33 +143,23 @@ export function App() {
     setSelectedId(id);
   };
 
-  const createNote = async () => {
+  const newNote = () => {
     if (!confirmDiscard()) return;
-    const title = window.prompt("New note title?");
-    if (!title) return;
-    try {
-      const note = await api.create({ title, category: categories[0]?.id ?? "uncategorized" });
-      await refreshLists();
-      setSelectedId(note.id);
-    } catch (e) {
-      setStatus((e as Error).message);
-    }
+    setDraft(makeBlank(categories));
+    setOriginal("");
+    setSelectedId(null);
+    setIssues([]);
+    setStatus("");
   };
 
-  // Clone: duplicate the loaded note's whole body under a fresh id, as a new draft.
   const cloneNote = async () => {
     if (!draft || !confirmDiscard()) return;
     const title = window.prompt("Title for the cloned note?", `${draft.title} (copy)`);
     if (!title) return;
-    setStatus("Cloning…");
+    setStatus("Cloning...");
     try {
       const skeleton = await api.create({ title, category: draft.category });
-      const saved = await api.save(skeleton.id, {
-        ...draft,
-        id: skeleton.id,
-        title,
-        draft: true,
-      });
+      const saved = await api.save(skeleton.id, { ...draft, id: skeleton.id, title, draft: true });
       await refreshLists();
       setSelectedId(saved.id);
       setStatus(`Cloned to ${saved.id}`);
@@ -170,7 +168,6 @@ export function App() {
     }
   };
 
-  // Place imported blocks per the chosen target: append, replace, or nest under a section.
   const insertImported = (blocks: BlockNode[], target: InsertTarget) => {
     if (!draft) return;
     if (target.mode === "replace") return patch({ body: blocks });
@@ -183,20 +180,29 @@ export function App() {
   };
 
   const save = async () => {
-    if (!draft || !selectedId) return;
+    if (!draft) return;
     setIssues([]);
-    setStatus("Saving…");
+    setStatus("Saving...");
     try {
-      const saved = await api.save(selectedId, draft);
+      let id = selectedId;
+      if (!id) {
+        const created = await api.create({
+          id: draft.id.trim() || undefined,
+          title: draft.title.trim() || "Untitled",
+          category: draft.category || (categories[0]?.id ?? "uncategorized"),
+        });
+        id = created.id;
+      }
+      const saved = await api.save(id, { ...draft, id: draft.id.trim() || id });
       setDraft(saved);
       setOriginal(JSON.stringify(saved));
+      setSelectedId(saved.id);
       setStatus(`Saved ${saved.id}`);
       await refreshLists();
-      if (saved.id !== selectedId) setSelectedId(saved.id); // followed a rename
     } catch (e) {
       if (e instanceof ApiError && e.issues) {
         setIssues(e.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`));
-        setStatus("Validation failed — fix the fields below.");
+        setStatus("Validation failed -- fix the fields below.");
       } else {
         setStatus((e as Error).message);
       }
@@ -207,23 +213,23 @@ export function App() {
     if (!selectedId || !window.confirm(`Delete note "${selectedId}"? This removes its folder.`)) return;
     await api.remove(selectedId);
     setSelectedId(null);
-    setDraft(null);
+    setDraft(makeBlank(categories));
+    setOriginal("");
     await refreshLists();
   };
 
-  const dockOpen = importOpen && Boolean(draft);
-
   return (
-    <div className={`app ${dockOpen ? "withDock" : ""}`}>
+    <div className="app">
+      {/* Sidebar: note list */}
       <aside className="sidebar">
         <div className="brand">
           Notes Admin <span className="local">local-only</span>
         </div>
-        <button className="primary block" onClick={createNote}>+ New note</button>
-        <button className="block" onClick={() => setCatalogOpen(true)}>Manage catalog…</button>
+        <button className="primary block" onClick={newNote}>+ New note</button>
+        <button className="block" onClick={() => setCatalogOpen(true)}>Manage catalog...</button>
         <input
           className="filterBox"
-          placeholder="Filter notes…"
+          placeholder="Filter notes..."
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
@@ -242,79 +248,58 @@ export function App() {
               </button>
             </li>
           ))}
-          {visibleNotes.length === 0 && <li className="noteMeta">No notes match “{filter}”.</li>}
+          {visibleNotes.length === 0 && <li className="noteMeta">No notes match "{filter}".</li>}
         </ul>
         {dupes.length > 0 && (
           <div className="dupesSummary">⚠ {dupes.length} duplicate group(s) across notes</div>
         )}
       </aside>
 
-      {dockOpen && (
-        <ImportDialog
-          docked
-          sections={sections}
-          onClose={() => setImportOpen(false)}
-          onResult={insertImported}
-        />
-      )}
+      {/* Main content: paste panes (top) + envelope form (bottom) */}
+      <main className="workarea">
+        {/* Top: always-visible paste notes area */}
+        <section className="pasteSection">
+          <ImportDialog
+            embedded
+            sections={sections}
+            onClose={() => {}}
+            onResult={insertImported}
+          />
+        </section>
 
-      {draft ? (
-        <main className="editor">
-          <div className="toolbar">
-            <strong>{draft.title || draft.id}</strong>
-            {dirty && <span className="dirty">● unsaved</span>}
-            <span className="spacer" />
-            <button
-              className="toggle"
-              data-on={syncScroll}
-              title="Link editor & preview scrolling"
-              onClick={() => setSyncScroll((v) => !v)}
-            >
-              ⇅ scroll: {syncScroll ? "linked" : "free"}
-            </button>
-            <button className="toggle" data-on={importOpen} onClick={() => setImportOpen((v) => !v)}>
-              Paste{importOpen ? " ✓" : "…"}
-            </button>
-            <button onClick={cloneNote}>Clone</button>
-            <button className="danger" onClick={remove}>Delete</button>
-            <button className="primary" disabled={!dirty} onClick={save}>Save</button>
-          </div>
-
-          {status && <div className="status">{status}</div>}
-          {issues.length > 0 && (
-            <ul className="issues">
-              {issues.map((i) => (
-                <li key={i}>{i}</li>
-              ))}
-            </ul>
+        {/* Bottom: note metadata form + toolbar */}
+        <section className="formSection">
+          {draft ? (
+            <>
+              <div className="toolbar">
+                <strong>{draft.title || (selectedId ? draft.id : "New note")}</strong>
+                {dirty && <span className="dirty">unsaved</span>}
+                <span className="spacer" />
+                {selectedId && <button onClick={cloneNote}>Clone</button>}
+                {selectedId && <button className="danger" onClick={remove}>Delete</button>}
+                <button className="primary" disabled={!dirty} onClick={save}>Save</button>
+              </div>
+              {status && <div className="status">{status}</div>}
+              {issues.length > 0 && (
+                <ul className="issues">
+                  {issues.map((i) => <li key={i}>{i}</li>)}
+                </ul>
+              )}
+              <div className="formScroll">
+                <EnvelopeForm
+                  note={draft}
+                  onChange={patch}
+                  categories={categories}
+                  domains={domains}
+                  allLabels={allLabels}
+                />
+              </div>
+            </>
+          ) : (
+            <p style={{ padding: "1rem", opacity: 0.5 }}>Loading...</p>
           )}
-
-          <div className="editScroll" ref={editScrollRef}>
-            <EnvelopeForm
-              note={draft}
-              onChange={patch}
-              categories={categories}
-              domains={domains}
-              allLabels={allLabels}
-            />
-            <h3 className="sectionHead">Blocks</h3>
-            <BlockEditor
-              body={draft.body}
-              onChange={(body) => patch({ body })}
-              dupeFlags={dupeFlags}
-              noteId={draft.id}
-            />
-          </div>
-        </main>
-      ) : (
-        <main className="editor empty">
-          <p>Select a note, or create one.</p>
-        </main>
-      )}
-
-      <aside className="preview" ref={previewRef}>
-        {draft && <Preview note={draft} />}
-      </aside>
+        </section>
+      </main>
 
       {catalogOpen && (
         <CatalogDialog

@@ -1,20 +1,25 @@
 /**
- * Live preview — the real site renderer (PLAN §7: one source of truth). Renders the draft
- * note exactly as the site would via NoteView, inside a MemoryRouter so its internal <Link>s
- * and useLocation work without touching the admin's own routing. Code shows un-highlighted
- * (Shiki runs at build only); everything else matches production.
+ * Live preview — renders just the note body (TreeView) with no chrome: no breadcrumbs,
+ * no header, no view switcher, no related section. Uses the real block renderers so
+ * what you see matches production output.
  */
 import { MemoryRouter } from "react-router-dom";
 import type { Note } from "../../src/lib/schema.ts";
-import { NoteView } from "../../src/components/NoteView.tsx";
+import { NoteContext } from "../../src/components/blocks/context.ts";
+import { TreeView } from "../../src/components/views/TreeView.tsx";
+import { TooltipProvider } from "../../src/components/ui/Tooltip.tsx";
 import "../../src/index.css";
 
 export function Preview({ note }: { note: Note }) {
   return (
     <MemoryRouter>
-      <div className="previewSurface">
-        <NoteView note={note} />
-      </div>
+      <TooltipProvider delayDuration={350} skipDelayDuration={200}>
+        <NoteContext.Provider value={{ noteId: note.id }}>
+          <div className="previewSurface">
+            <TreeView note={note} showControls={false} />
+          </div>
+        </NoteContext.Provider>
+      </TooltipProvider>
     </MemoryRouter>
   );
 }

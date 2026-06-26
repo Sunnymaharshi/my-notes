@@ -13,7 +13,7 @@
  *     insert → paste again without reopening. Insert never closes it.
  * Insert target (`onResult`): append to the end, replace the body, or nest under a section.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { BlockNodeSchema, type BlockNode, type Note } from "../../src/lib/schema.ts";
 import { api } from "./api.ts";
@@ -50,12 +50,15 @@ export function ImportDialog({
   onResult,
   sections,
   docked = false,
+  embedded = false,
 }: {
   onClose: () => void;
   onResult: (body: BlockNode[], target: InsertTarget) => void;
   /** Top-level sections of the current note, for the "nest under…" insert target. */
   sections: { path: string; label: string }[];
   docked?: boolean;
+  /** Render just the inner content with no wrapper (used when embedded in the editor layout). */
+  embedded?: boolean;
 }) {
   const [text, setText] = useState("");
   const [ext, setExt] = useState<string>(".txt");
@@ -69,6 +72,58 @@ export function ImportDialog({
   // Insert target, encoded: "append" | "replace" | "section:<path>".
   const [target, setTarget] = useState("append");
   const [inserted, setInserted] = useState<string | null>(null);
+
+  // Drag-to-resize: leftPct is the source pane width as a percentage of the container.
+  const [leftPct, setLeftPct] = useState(50);
+  const panesRef = useRef<HTMLDivElement>(null);
+  const dragging = useRef(false);
+
+  // Sync scroll between source textarea and generated pane.
+  const [syncScroll, setSyncScroll] = useState(false);
+  const sourceRef = useRef<HTMLTextAreaElement>(null);
+  const generatedRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!syncScroll) return;
+    const src = sourceRef.current;
+    const gen = generatedRef.current;
+    if (!src || !gen) return;
+    let locked = false;
+    const mirror = (from: HTMLElement, to: HTMLElement) => {
+      if (locked) return;
+      locked = true;
+      const max = from.scrollHeight - from.clientHeight;
+      const ratio = max > 0 ? from.scrollTop / max : 0;
+      to.scrollTop = ratio * (to.scrollHeight - to.clientHeight);
+      requestAnimationFrame(() => { locked = false; });
+    };
+    const onSrc = () => mirror(src, gen);
+    const onGen = () => mirror(gen, src);
+    src.addEventListener("scroll", onSrc);
+    gen.addEventListener("scroll", onGen);
+    return () => {
+      src.removeEventListener("scroll", onSrc);
+      gen.removeEventListener("scroll", onGen);
+    };
+  }, [syncScroll]);
+
+  const onDividerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    dragging.current = true;
+    const onMove = (mv: MouseEvent) => {
+      if (!dragging.current || !panesRef.current) return;
+      const rect = panesRef.current.getBoundingClientRect();
+      const pct = Math.min(80, Math.max(20, ((mv.clientX - rect.left) / rect.width) * 100));
+      setLeftPct(pct);
+    };
+    const onUp = () => {
+      dragging.current = false;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, []);
 
   // Set the working tree + mirror it into the editable JSON pane.
   const setGenerated = (next: BlockNode[]) => {
@@ -180,7 +235,7 @@ export function ImportDialog({
   const inner = (
     <>
       <div className="importHead">
-        <h2>{docked ? "Paste notes" : "Import raw notes"}</h2>
+        <h2>{docked || embedded ? "Paste notes" : "Import raw notes"}</h2>
         <label className="field inline">
           <span>Language</span>
           <select value={ext} onChange={(e) => setExt(e.target.value)}>
@@ -191,6 +246,14 @@ export function ImportDialog({
             ))}
           </select>
         </label>
+        <button
+          className="toggle"
+          data-on={syncScroll}
+          title="Sync scroll between source and generated"
+          onClick={() => setSyncScroll((v) => !v)}
+        >
+          ⇅ scroll: {syncScroll ? "linked" : "free"}
+        </button>
         <span className="spacer" />
         <span className="hint">{status}</span>
         {docked && (
@@ -200,19 +263,24 @@ export function ImportDialog({
         )}
       </div>
 
-      <div className={`importPanes ${docked ? "dock" : ""}`}>
-        <div className="importPane">
+      <div className={`importPanes ${docked ? "dock" : ""}`} ref={panesRef}>
+        <div className="importPane" style={docked ? undefined : { width: `${leftPct}%` }}>
           <div className="paneHead">Source</div>
           <textarea
+            ref={sourceRef}
             className="mono importArea"
-            placeholder={"Paste raw notes here…\n\nTopic\n    Subtopic\n    ```python\n    print('x')\n    ```"}
+            placeholder={"Paste raw notes here...\n\nTopic\n    Subtopic\n    ```python\n    print('x')\n    ```"}
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
           {importError && <div className="paneError">{importError}</div>}
         </div>
 
-        <div className="importPane">
+        {!docked && (
+          <div className="paneDivider" onMouseDown={onDividerMouseDown} title="Drag to resize" />
+        )}
+
+        <div className="importPane" style={docked ? undefined : { width: `${100 - leftPct}%` }}>
           <div className="paneHead">
             Generated
             <span className="spacer" />
@@ -226,6 +294,7 @@ export function ImportDialog({
 
           {view === "json" ? (
             <textarea
+              ref={generatedRef as unknown as React.RefObject<HTMLTextAreaElement>}
               className="mono importArea"
               spellCheck={false}
               placeholder="Generated block JSON appears here once you paste source."
@@ -233,7 +302,7 @@ export function ImportDialog({
               onChange={(e) => onJsonChange(e.target.value)}
             />
           ) : (
-            <div className="paneBody">
+            <div ref={generatedRef as unknown as React.RefObject<HTMLDivElement>} className="paneBody">
               {!body?.length && <p className="hint">Nothing parsed yet.</p>}
               {body?.length ? <Preview note={previewNote} /> : null}
             </div>
@@ -249,7 +318,7 @@ export function ImportDialog({
       </p>
 
       <div className="modalActions">
-        {!docked && <button onClick={onClose}>Cancel</button>}
+        {!docked && !embedded && <button onClick={onClose}>Cancel</button>}
         <label className="field inline">
           <span>Insert</span>
           <select value={target} onChange={(e) => setTarget(e.target.value)}>
@@ -270,6 +339,7 @@ export function ImportDialog({
     </>
   );
 
+  if (embedded) return <>{inner}</>;
   if (docked) return <aside className="importDock">{inner}</aside>;
   return (
     <div className="modalOverlay" onClick={onClose}>

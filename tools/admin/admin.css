@@ -2,14 +2,51 @@
 
 .app {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: 240px minmax(0, 1fr);
   height: 100vh;
   overflow: hidden;
 }
 
-/* When the paste pane is docked: sidebar | paste | editor | preview (4 columns). */
-.app.withDock {
-  grid-template-columns: 240px minmax(320px, 0.8fr) minmax(0, 1fr) minmax(0, 1fr);
+/* Main content area: single scrollable column */
+.workarea {
+  min-width: 0;
+  overflow-y: auto;
+}
+
+/* Paste section: full viewport height, flex column, panes fill remaining space */
+.pasteSection {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 2px solid var(--border);
+  padding: 12px 16px;
+  gap: 10px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.pasteSection .importHead {
+  flex-shrink: 0;
+}
+.pasteSection p.hint {
+  flex-shrink: 0;
+  margin: 0;
+}
+.pasteSection .modalActions {
+  flex-shrink: 0;
+}
+.pasteSection .importPanes {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+
+/* Form section: below paste, scrolls into view */
+.formSection {
+  display: flex;
+  flex-direction: column;
+}
+.formScroll {
+  padding: 0 20px 24px;
 }
 
 /* ---- sidebar ---- */
@@ -92,19 +129,7 @@
   color: #e3b341;
 }
 
-/* ---- editor ---- */
-.editor {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  border-right: 1px solid var(--border);
-  overflow: hidden;
-}
-.editor.empty {
-  align-items: center;
-  justify-content: center;
-  color: var(--text-dim);
-}
+/* ---- toolbar (used in formSection) ---- */
 .toolbar {
   display: flex;
   align-items: center;
@@ -405,27 +430,20 @@ button.toggle[data-on="true"] {
   margin: 0;
 }
 
-/* docked paste pane: a persistent left working column (non-modal). */
+/* docked paste pane: occupies the right column (same slot as preview). */
 .importDock {
   display: flex;
   flex-direction: column;
   min-width: 0;
   gap: 12px;
   padding: 12px 16px;
-  border-right: 1px solid var(--border);
+  border-left: 1px solid var(--border);
   background: var(--bg-elev);
   overflow: hidden;
 }
 .importDock h2 {
   margin: 0;
   font-size: 16px;
-}
-/* stack source over generated when the pane is narrow */
-.importPanes.dock {
-  grid-template-columns: 1fr;
-  grid-template-rows: 1fr 1fr;
-  height: auto;
-  flex: 1;
 }
 .importDock .modalActions {
   flex-wrap: wrap;
@@ -446,20 +464,40 @@ button.toggle[data-on="true"] {
   gap: 6px;
 }
 .importPanes {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  display: flex;
+  flex-direction: row;
+  gap: 0;
   height: 64vh;
   min-height: 0;
+}
+/* stacked layout for docked (narrow) pane */
+.importPanes.dock {
+  flex-direction: column;
+  height: auto;
+  flex: 1;
+}
+.paneDivider {
+  width: 6px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: var(--border);
+  transition: background 0.15s;
+  position: relative;
+}
+.paneDivider:hover,
+.paneDivider:active {
+  background: var(--accent, #f5c842);
 }
 .importPane {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   border: 1px solid var(--border);
   border-radius: 9px;
   overflow: hidden;
   background: var(--bg);
+  flex-shrink: 0;
 }
 .paneHead {
   display: flex;
