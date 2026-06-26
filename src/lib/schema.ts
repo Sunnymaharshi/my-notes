@@ -16,12 +16,20 @@ import { z } from "zod";
 export const CalloutVariant = z.enum(["tip", "warning", "info", "note", "gotcha"]);
 export type CalloutVariant = z.infer<typeof CalloutVariant>;
 
+// An outline node marked `topic` is a self-contained, showable unit (the deep-link
+// target for search). Topics nest freely (a topic can contain topics); "sub-topic"
+// is just a topic with a parent topic. Unmarked outline nodes are detail lines
+// inside the nearest topic. Extensible: add roles here as the content needs them.
+export const OutlineRole = z.enum(["topic"]);
+export type OutlineRole = z.infer<typeof OutlineRole>;
+
 // `outline` is recursive (children can be any block node), so its schema is
 // defined via z.lazy and the BlockNode union is typed explicitly.
 export interface OutlineNode {
   type: "outline";
   text: string;
   note?: string;
+  role?: OutlineRole;
   children?: BlockNode[];
 }
 
@@ -48,6 +56,13 @@ export interface CalloutNode {
   text: string;
 }
 
+// Free-form prose paragraph, not bound to the outline tree. `text` is a string in v1
+// (upgradeable to spans+marks later, like outline text, without migrating notes).
+export interface TextNode {
+  type: "text";
+  text: string;
+}
+
 export interface TableNode {
   type: "table";
   headers: string[];
@@ -65,6 +80,7 @@ export type BlockNode =
   | CodeNode
   | ImageNode
   | CalloutNode
+  | TextNode
   | TableNode
   | FlashcardNode;
 
@@ -90,6 +106,11 @@ export const CalloutNodeSchema = z.object({
   text: z.string().min(1),
 });
 
+export const TextNodeSchema = z.object({
+  type: z.literal("text"),
+  text: z.string().min(1),
+});
+
 export const TableNodeSchema = z.object({
   type: z.literal("table"),
   headers: z.array(z.string()).min(1),
@@ -109,11 +130,13 @@ export const BlockNodeSchema: z.ZodType<BlockNode> = z.lazy(() =>
       type: z.literal("outline"),
       text: z.string().min(1),
       note: z.string().optional(),
+      role: OutlineRole.optional(),
       children: z.array(BlockNodeSchema).optional(),
     }),
     CodeNodeSchema,
     ImageNodeSchema,
     CalloutNodeSchema,
+    TextNodeSchema,
     TableNodeSchema,
     FlashcardNodeSchema,
   ]),
@@ -148,9 +171,22 @@ export type NoteMeta = Pick<
   "id" | "title" | "category" | "labels" | "summary" | "difficulty" | "updated"
 > & { draft?: boolean };
 
+// A domain is the broadest grouping (frontend, backend, …); a category (a technology
+// like react/fastapi) belongs to one domain via `domain`. Notes belong to a category.
+export const DomainSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  color: z.string().optional(),
+  icon: z.string().optional(),
+  order: z.number().int().default(0),
+});
+
+export type Domain = z.infer<typeof DomainSchema>;
+
 export const CategorySchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
+  domain: z.string().min(1),
   color: z.string().optional(),
   icon: z.string().optional(),
   order: z.number().int().default(0),

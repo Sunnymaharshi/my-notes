@@ -4,17 +4,20 @@
  * the build before writing content/notes/<id>/index.json. Local-only; never deployed.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Category, Note, NoteMeta } from "../../src/lib/schema.ts";
+import type { BlockNode, Category, Domain, Note, NoteMeta } from "../../src/lib/schema.ts";
 import { dupeFlagsForNote, type DupeGroup } from "../../src/lib/dupes.ts";
 import { api, ApiError } from "./api.ts";
 import { EnvelopeForm } from "./EnvelopeForm.tsx";
 import { BlockEditor } from "./BlockEditor.tsx";
 import { Preview } from "./Preview.tsx";
-import { ImportDialog } from "./ImportDialog.tsx";
+import { ImportDialog, type InsertTarget } from "./ImportDialog.tsx";
+import { CatalogDialog } from "./CatalogDialog.tsx";
+import { appendChild } from "./tree-ops.ts";
 
 export function App() {
   const [notes, setNotes] = useState<NoteMeta[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [domains, setDomains] = useState<Domain[]>([]);
   const [dupes, setDupes] = useState<DupeGroup[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Note | null>(null);
@@ -22,7 +25,9 @@ export function App() {
   const [issues, setIssues] = useState<string[]>([]);
   const [status, setStatus] = useState("");
   const [importOpen, setImportOpen] = useState(false);
+  const [catalogOpen, setCatalogOpen] = useState(false);
   const [syncScroll, setSyncScroll] = useState(false);
+  const [filter, setFilter] = useState("");
 
   const editScrollRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLElement>(null);
@@ -61,6 +66,7 @@ export function App() {
 
   useEffect(() => {
     api.categories().then(setCategories).catch(() => {});
+    api.domains().then(setDomains).catch(() => {});
     refreshLists().catch((e) => setStatus(String(e)));
   }, []);
 
@@ -89,7 +95,48 @@ export function App() {
 
   const patch = (p: Partial<Note>) => setDraft((d) => (d ? { ...d, ...p } : d));
 
+  // Filtered note list for the sidebar (matches title / category / labels, case-insensitive).
+  const visibleNotes = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return notes;
+    return notes.filter((n) =>
+      [n.title, n.category, ...n.labels].join(" ").toLowerCase().includes(q),
+    );
+  }, [notes, filter]);
+
+  // Top-level sections of the current note — targets for "insert under…" on import.
+  const sections = useMemo(
+    () =>
+      (draft?.body ?? [])
+        .map((node, i) => ({ node, path: String(i) }))
+        .filter((s) => s.node.type === "outline")
+        .map((s) => ({ path: s.path, label: (s.node as { text: string }).text })),
+    [draft],
+  );
+
+  // Unsaved-changes guard: confirm before any action that would discard the current edits.
+  const confirmDiscard = () =>
+    !dirty || window.confirm("Discard unsaved changes to this note?");
+
+  // Warn on a hard browser close/reload while there are unsaved edits.
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (dirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
+
+  const selectNote = (id: string) => {
+    if (id === selectedId || !confirmDiscard()) return;
+    setSelectedId(id);
+  };
+
   const createNote = async () => {
+    if (!confirmDiscard()) return;
     const title = window.prompt("New note title?");
     if (!title) return;
     try {
@@ -99,6 +146,40 @@ export function App() {
     } catch (e) {
       setStatus((e as Error).message);
     }
+  };
+
+  // Clone: duplicate the loaded note's whole body under a fresh id, as a new draft.
+  const cloneNote = async () => {
+    if (!draft || !confirmDiscard()) return;
+    const title = window.prompt("Title for the cloned note?", `${draft.title} (copy)`);
+    if (!title) return;
+    setStatus("Cloning…");
+    try {
+      const skeleton = await api.create({ title, category: draft.category });
+      const saved = await api.save(skeleton.id, {
+        ...draft,
+        id: skeleton.id,
+        title,
+        draft: true,
+      });
+      await refreshLists();
+      setSelectedId(saved.id);
+      setStatus(`Cloned to ${saved.id}`);
+    } catch (e) {
+      setStatus((e as Error).message);
+    }
+  };
+
+  // Place imported blocks per the chosen target: append, replace, or nest under a section.
+  const insertImported = (blocks: BlockNode[], target: InsertTarget) => {
+    if (!draft) return;
+    if (target.mode === "replace") return patch({ body: blocks });
+    if (target.mode === "section") {
+      let body = draft.body;
+      for (const b of blocks) body = appendChild(body, target.path, b);
+      return patch({ body });
+    }
+    patch({ body: [...draft.body, ...blocks] });
   };
 
   const save = async () => {
@@ -130,19 +211,28 @@ export function App() {
     await refreshLists();
   };
 
+  const dockOpen = importOpen && Boolean(draft);
+
   return (
-    <div className="app">
+    <div className={`app ${dockOpen ? "withDock" : ""}`}>
       <aside className="sidebar">
         <div className="brand">
           Notes Admin <span className="local">local-only</span>
         </div>
         <button className="primary block" onClick={createNote}>+ New note</button>
+        <button className="block" onClick={() => setCatalogOpen(true)}>Manage catalog…</button>
+        <input
+          className="filterBox"
+          placeholder="Filter notes…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
         <ul className="noteList">
-          {notes.map((n) => (
+          {visibleNotes.map((n) => (
             <li key={n.id}>
               <button
                 className={n.id === selectedId ? "noteItem active" : "noteItem"}
-                onClick={() => setSelectedId(n.id)}
+                onClick={() => selectNote(n.id)}
               >
                 <span className="noteTitle">{n.title}</span>
                 <span className="noteMeta">
@@ -152,11 +242,21 @@ export function App() {
               </button>
             </li>
           ))}
+          {visibleNotes.length === 0 && <li className="noteMeta">No notes match “{filter}”.</li>}
         </ul>
         {dupes.length > 0 && (
           <div className="dupesSummary">⚠ {dupes.length} duplicate group(s) across notes</div>
         )}
       </aside>
+
+      {dockOpen && (
+        <ImportDialog
+          docked
+          sections={sections}
+          onClose={() => setImportOpen(false)}
+          onResult={insertImported}
+        />
+      )}
 
       {draft ? (
         <main className="editor">
@@ -172,7 +272,10 @@ export function App() {
             >
               ⇅ scroll: {syncScroll ? "linked" : "free"}
             </button>
-            <button onClick={() => setImportOpen(true)}>Import…</button>
+            <button className="toggle" data-on={importOpen} onClick={() => setImportOpen((v) => !v)}>
+              Paste{importOpen ? " ✓" : "…"}
+            </button>
+            <button onClick={cloneNote}>Clone</button>
             <button className="danger" onClick={remove}>Delete</button>
             <button className="primary" disabled={!dirty} onClick={save}>Save</button>
           </div>
@@ -187,7 +290,13 @@ export function App() {
           )}
 
           <div className="editScroll" ref={editScrollRef}>
-            <EnvelopeForm note={draft} onChange={patch} categories={categories} allLabels={allLabels} />
+            <EnvelopeForm
+              note={draft}
+              onChange={patch}
+              categories={categories}
+              domains={domains}
+              allLabels={allLabels}
+            />
             <h3 className="sectionHead">Blocks</h3>
             <BlockEditor
               body={draft.body}
@@ -207,12 +316,15 @@ export function App() {
         {draft && <Preview note={draft} />}
       </aside>
 
-      {importOpen && (
-        <ImportDialog
-          onClose={() => setImportOpen(false)}
-          onResult={(body, mode) =>
-            patch({ body: mode === "replace" ? body : [...(draft?.body ?? []), ...body] })
-          }
+      {catalogOpen && (
+        <CatalogDialog
+          categories={categories}
+          domains={domains}
+          onClose={() => setCatalogOpen(false)}
+          onSaved={(c, d) => {
+            setCategories(c);
+            setDomains(d);
+          }}
         />
       )}
     </div>

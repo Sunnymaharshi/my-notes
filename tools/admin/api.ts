@@ -1,5 +1,5 @@
 /** Thin client for the admin API (tools/admin/server.ts). */
-import type { BlockNode, Category, Note, NoteMeta } from "../../src/lib/schema.ts";
+import type { BlockNode, Category, Domain, Note, NoteMeta } from "../../src/lib/schema.ts";
 import type { DupeGroup } from "../../src/lib/dupes.ts";
 import type { ZodIssue } from "zod";
 
@@ -28,6 +28,10 @@ const jsonInit = (method: string, body: unknown): RequestInit => ({
 
 export const api = {
   categories: () => req<Category[]>("/api/categories"),
+  saveCategories: (cats: Category[], renames?: Record<string, string>) =>
+    req<Category[]>("/api/categories", jsonInit("PUT", { categories: cats, renames })),
+  domains: () => req<Domain[]>("/api/domains"),
+  saveDomains: (doms: Domain[]) => req<Domain[]>("/api/domains", jsonInit("PUT", doms)),
   notes: () => req<NoteMeta[]>("/api/notes"),
   note: (id: string) => req<Note>(`/api/notes/${id}`),
   create: (input: { id?: string; title: string; category: string }) =>

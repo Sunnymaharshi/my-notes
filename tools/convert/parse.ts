@@ -70,6 +70,18 @@ interface Frame {
   node: { children?: BlockNode[] };
 }
 
+/** Seed `role: "topic"` on the top outline branches (depth 0–1 nodes that have children).
+ *  A faithful first guess at the self-contained, search-deep-linkable units; refine by hand
+ *  after converting (see tools/convert/README.md). Leaf lines stay unmarked details. */
+function seedRoles(nodes: BlockNode[], depth = 0): void {
+  if (depth > 1) return;
+  for (const node of nodes) {
+    if (node.type !== "outline" || !node.children?.length) continue;
+    node.role = "topic";
+    seedRoles(node.children, depth + 1);
+  }
+}
+
 export function parse(text: string, defaultLang: string): BlockNode[] {
   const lines = stripCommentWrapper(text.split("\n"));
   const root: { children: BlockNode[] } = { children: [] };
@@ -110,6 +122,7 @@ export function parse(text: string, defaultLang: string): BlockNode[] {
     stack.push({ indent, node });
   }
 
+  seedRoles(root.children);
   return root.children;
 }
 
@@ -132,6 +145,7 @@ async function main() {
   if (!arg("title") && body.length === 1 && body[0].type === "outline") {
     title = body[0].text;
     body = body[0].children ?? [];
+    seedRoles(body); // depths shifted up by the lift — re-seed the new top branches
   }
 
   const __dirname = path.dirname(fileURLToPath(import.meta.url));

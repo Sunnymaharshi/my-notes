@@ -13,6 +13,8 @@
             t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
           }
           document.documentElement.dataset.theme = t;
+          var d = localStorage.getItem("density");
+          document.documentElement.dataset.density = d === "compact" ? "compact" : "comfortable";
         } catch (e) {}
       })();
     </script>

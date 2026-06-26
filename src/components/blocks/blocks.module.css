@@ -6,16 +6,18 @@
 .branchHeader {
   display: flex;
   align-items: flex-start;
-  gap: 7px;
+  gap: var(--sp-2);
   width: 100%;
   text-align: left;
   background: none;
   border: none;
   color: var(--text);
   font: inherit;
-  padding: 4px 6px;
-  border-radius: 6px;
+  font-weight: 500;
+  padding: 5px var(--sp-2);
+  border-radius: var(--r-sm);
   cursor: pointer;
+  transition: background var(--dur-1);
 }
 
 .branchHeader:hover {
@@ -23,32 +25,42 @@
 }
 
 .caret {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
   color: var(--text-dim);
-  font-size: 11px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.4;
   flex-shrink: 0;
+  transition: color var(--dur-1);
+}
+
+.branchHeader:hover .caret,
+.branchHeader[aria-expanded="true"] .caret {
+  color: var(--hl);
 }
 
 .children {
-  margin-left: 13px;
-  padding-left: 12px;
+  margin-left: 14px;
+  padding-left: var(--sp-3);
   border-left: 1px solid var(--border);
 }
 
 .leaf {
   display: flex;
   align-items: flex-start;
-  gap: 7px;
-  padding: 4px 6px 4px 6px;
+  gap: var(--sp-2);
+  padding: 4px var(--sp-2);
+  color: var(--text-mid);
 }
 
 .bullet {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--text-dim);
-  margin-top: 8px;
+  background: var(--text-faint);
+  margin-top: 9px;
   flex-shrink: 0;
 }
 
@@ -57,57 +69,96 @@
   font-style: italic;
 }
 
+/* --- text (prose paragraph) --- */
+.prose {
+  color: var(--text-mid);
+  line-height: 1.7;
+  margin: var(--sp-2) 0;
+}
+.prose p {
+  margin: 0 0 var(--sp-3);
+}
+.prose p:last-child {
+  margin-bottom: 0;
+}
+
 /* --- code --- */
 .code {
-  margin: 10px 0;
+  margin: var(--sp-3) 0;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   overflow: hidden;
-  background: #0b0f14;
+  background: var(--code-bg);
+  box-shadow: var(--shadow-1);
 }
 
 .codeBar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 12px;
+  padding: 7px var(--sp-3);
   border-bottom: 1px solid var(--border);
   background: var(--bg-elev);
 }
 
 .codeLang {
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: 0.04em;
   color: var(--text-dim);
-  font-family: ui-monospace, monospace;
 }
 
 .copyBtn {
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-dim);
   background: none;
   border: 1px solid var(--border);
-  border-radius: 5px;
-  padding: 2px 8px;
+  border-radius: var(--r-sm);
+  padding: 2px var(--sp-2);
   cursor: pointer;
+  transition: color var(--dur-1), border-color var(--dur-1);
 }
 
 .copyBtn:hover {
-  color: var(--text);
-  border-color: var(--text-dim);
+  color: var(--hl);
+  border-color: var(--border-strong);
 }
 
 .shiki :global(pre.shiki) {
   margin: 0;
-  padding: 12px 14px;
+  padding: var(--sp-3) var(--sp-4);
   overflow-x: auto;
   background: transparent !important;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.62;
+}
+
+/* Dual-theme tokens: default to the dark palette, swap to light under [data-theme="light"].
+   Shiki (defaultColor:false) writes both as --shiki-dark / --shiki-light per token. */
+.shiki :global(pre.shiki),
+.shiki :global(pre.shiki span) {
+  color: var(--shiki-dark);
+}
+
+:global([data-theme="light"]) .shiki :global(pre.shiki),
+:global([data-theme="light"]) .shiki :global(pre.shiki span) {
+  color: var(--shiki-light);
+}
+
+/* Emphasized lines (code node `highlight: [..]`) — the highlighter, on code. */
+.shiki :global(.line.highlighted) {
+  display: inline-block;
+  width: calc(100% + 32px);
+  margin: 0 -16px;
+  padding: 0 16px;
+  background: var(--hl-soft);
+  box-shadow: inset 3px 0 0 var(--hl);
 }
 
 .codePlain {
   margin: 0;
-  padding: 12px 14px;
+  padding: var(--sp-3) var(--sp-4);
   overflow-x: auto;
   font-size: 13px;
 }
@@ -115,10 +166,10 @@
 /* --- callout --- */
 .callout {
   display: flex;
-  gap: 9px;
-  margin: 10px 0;
-  padding: 10px 13px;
-  border-radius: 9px;
+  gap: var(--sp-3);
+  margin: var(--sp-3) 0;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
   border: 1px solid var(--border);
   border-left-width: 3px;
   background: var(--bg-elev);
@@ -129,23 +180,25 @@
 }
 
 .callout_tip {
-  border-left-color: #2ecc71;
+  border-left-color: var(--good);
 }
 .callout_warning,
 .callout_gotcha {
-  border-left-color: #e3b341;
+  border-left-color: var(--warn);
 }
 .callout_info {
   border-left-color: var(--accent);
 }
 .callout_note {
-  border-left-color: var(--text-dim);
+  border-left-color: var(--text-faint);
 }
 
 /* --- table --- */
 .tableWrap {
-  margin: 10px 0;
+  margin: var(--sp-3) 0;
   overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
 }
 
 .table {
@@ -156,14 +209,25 @@
 
 .table th,
 .table td {
-  border: 1px solid var(--border);
-  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  padding: 8px var(--sp-3);
   text-align: left;
+}
+.table th:last-child,
+.table td:last-child {
+  border-right: none;
+}
+.table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .table th {
   background: var(--bg-elev);
   font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: 0.02em;
 }
 
 .table tbody tr:hover {
@@ -175,64 +239,68 @@
   display: block;
   width: 100%;
   text-align: left;
-  margin: 10px 0;
-  padding: 12px 14px;
+  margin: var(--sp-3) 0;
+  padding: var(--sp-3) var(--sp-4);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--bg-elev);
   color: var(--text);
   font: inherit;
   cursor: pointer;
+  transition: border-color var(--dur-1);
 }
 
 .flashcard:hover {
-  border-color: var(--accent);
+  border-color: var(--hl-line);
 }
 
 .flashcardQ {
   display: flex;
-  gap: 9px;
+  gap: var(--sp-3);
   font-weight: 600;
 }
 
 .flashcardA {
   display: flex;
-  gap: 9px;
-  color: var(--text-dim);
-  padding-top: 9px;
-  margin-top: 9px;
+  gap: var(--sp-3);
+  color: var(--text-mid);
+  padding-top: var(--sp-3);
+  margin-top: var(--sp-3);
   border-top: 1px solid var(--border);
 }
 
 .flashcardTag {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--accent);
-  background: rgba(88, 166, 255, 0.12);
-  border-radius: 5px;
-  padding: 1px 7px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--hl);
+  background: var(--hl-soft);
+  border-radius: var(--r-sm);
+  padding: 2px 7px;
   height: fit-content;
 }
 
 .flashcardHint {
+  font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--text-dim);
-  margin-top: 7px;
+  color: var(--text-faint);
+  margin-top: var(--sp-2);
 }
 
 /* --- image --- */
 .figure {
-  margin: 12px 0;
+  margin: var(--sp-4) 0;
 }
 
 .image {
   max-width: 100%;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-md);
 }
 
 .caption {
   color: var(--text-dim);
   font-size: 13px;
-  margin-top: 6px;
+  margin-top: var(--sp-2);
 }

@@ -58,6 +58,8 @@ function nodeText(node: BlockNode): string {
       return node.note ? `${node.text} ${node.note}` : node.text;
     case "callout":
       return node.text;
+    case "text":
+      return node.text;
     case "table":
       return [...node.headers, ...node.rows.flat()].join(" ");
     case "flashcard":
@@ -111,11 +113,11 @@ export const miniSearchConfig: MiniSearchOptions = {
   storeFields: STORE_FIELDS,
 };
 
-/** Query-time options: type-ahead (prefix + fuzzy), weighted by field. */
+/** Query-time options: type-ahead (prefix + fuzzy), weighted by field.
+ *  `combineWith` is set per-query by `runSearch` (AND first, OR fallback). */
 export const searchQueryOptions = {
   prefix: true,
   fuzzy: 0.2,
-  combineWith: "AND" as const,
   boost: { title: 6, summary: 4, labelsText: 3, category: 2, content: 1.5, code: 0.6 },
 };
 
@@ -171,19 +173,34 @@ function snippet(text: string): string {
   return t.length > SNIPPET_MAX ? `${t.slice(0, SNIPPET_MAX - 1)}…` : t;
 }
 
-/** Pick the node within a hit whose text best matches the query terms (deep-link target). */
-function resolveTarget(r: StoredResult): { nodeId?: string; snippet: string } {
+interface NodeMatch {
+  node: SearchNode;
+  /** how many distinct query terms appear in this node's text */
+  hits: number;
+  /** tree depth (1 = top level); shallower = more section-like */
+  depth: number;
+}
+
+/** Every node in a hit whose text contains a query term, ranked by specificity:
+ *  more term hits first, then shallower depth (section headings over leaf details).
+ *  A note can yield several matching subtopics — each becomes its own search result. */
+function matchingNodes(r: StoredResult): NodeMatch[] {
   const terms = r.terms.map((t) => t.toLowerCase());
-  let best: { node: SearchNode; hits: number } | null = null;
+  const matches: NodeMatch[] = [];
   for (const node of r.nodes) {
     const lower = node.t.toLowerCase();
     let hits = 0;
     for (const term of terms) if (lower.includes(term)) hits++;
-    if (hits > 0 && (!best || hits > best.hits)) best = { node, hits };
+    if (hits === 0) continue;
+    matches.push({ node, hits, depth: node.id.split(".").length });
   }
-  if (best) return { nodeId: best.node.id, snippet: snippet(best.node.t) };
-  return { snippet: snippet(r.summary || r.nodes[0]?.t || "") };
+  matches.sort((a, b) => b.hits - a.hits || a.depth - b.depth);
+  return matches;
 }
+
+/** At most this many subtopic hits per note, and overall, so a broad query never floods. */
+const PER_NOTE_MAX = 6;
+const TOTAL_MAX = 40;
 
 export interface SearchFacets {
   /** require the hit to carry ALL of these labels */
@@ -203,29 +220,49 @@ export async function runSearch(
   const mini = await loadSearchIndex(base);
   const { labels, category } = facets;
 
-  const results = mini.search(q, {
-    ...searchQueryOptions,
-    filter: (r) => {
-      const sr = r as unknown as StoredResult;
-      if (category && sr.category !== category) return false;
-      if (labels?.length && !labels.every((l) => sr.labels.includes(l))) return false;
-      return true;
-    },
-  }) as unknown as StoredResult[];
+  const filter = (r: unknown) => {
+    const sr = r as StoredResult;
+    if (category && sr.category !== category) return false;
+    if (labels?.length && !labels.every((l) => sr.labels.includes(l))) return false;
+    return true;
+  };
+  const search = (combineWith: "AND" | "OR") =>
+    mini.search(q, { ...searchQueryOptions, combineWith, filter }) as unknown as StoredResult[];
 
-  return results.map((r) => {
-    const { nodeId, snippet } = resolveTarget(r);
-    return {
+  // Prefer all-terms matches (precise); fall back to any-term so a single typo or an
+  // extra word never drops the hit entirely (e.g. "redis script" -> "redis lua scripts").
+  let results = search("AND");
+  if (results.length === 0) results = search("OR");
+
+  // Expand each note into one result per matching subtopic (deep-linkable), so a single
+  // note surfaces several relevant landing spots rather than collapsing to one. Results
+  // are ranked by node specificity within a note, then by the note's own relevance.
+  const hits: SearchHit[] = [];
+  for (const r of results) {
+    const base = {
       id: r.id,
       title: r.title,
       category: r.category,
       summary: r.summary,
       labels: r.labels,
-      score: r.score,
-      nodeId,
-      snippet,
     };
-  });
+    const matches = matchingNodes(r);
+    if (matches.length === 0) {
+      hits.push({ ...base, score: r.score, snippet: snippet(r.summary || r.nodes[0]?.t || "") });
+      continue;
+    }
+    matches.slice(0, PER_NOTE_MAX).forEach((m, i) => {
+      hits.push({
+        ...base,
+        // Boost multi-term nodes; the tiny `i` term preserves the within-note specificity order.
+        score: r.score * (1 + m.hits) - i * 1e-3,
+        nodeId: m.node.id,
+        snippet: snippet(m.node.t),
+      });
+    });
+  }
+  hits.sort((a, b) => b.score - a.score);
+  return hits.slice(0, TOTAL_MAX);
 }
 
 /** Build the deep-link path for a hit (or any note id + optional node path). */

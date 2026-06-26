@@ -6,6 +6,12 @@
  *   - Generated (right): a Preview (real renderer) or an editable JSON view of the blocks,
  *     validated live against the block schema. Edits to either side flow into what's inserted.
  * No model is called — any AI enrichment happens externally, by hand, on the JSON.
+ *
+ * Two presentations from the same body:
+ *   - modal (default): centered overlay, closes after an insert.
+ *   - docked (`docked`): a persistent left pane next to the editor, so you can paste →
+ *     insert → paste again without reopening. Insert never closes it.
+ * Insert target (`onResult`): append to the end, replace the body, or nest under a section.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
@@ -27,6 +33,12 @@ const EXTS = [
 
 const BodySchema = z.array(BlockNodeSchema);
 
+/** Where inserted blocks land in the current note. */
+export type InsertTarget =
+  | { mode: "append" }
+  | { mode: "replace" }
+  | { mode: "section"; path: string };
+
 const countBlocks = (body: BlockNode[]): number =>
   body.reduce(
     (n, node) => n + 1 + (node.type === "outline" && node.children ? countBlocks(node.children) : 0),
@@ -36,9 +48,14 @@ const countBlocks = (body: BlockNode[]): number =>
 export function ImportDialog({
   onClose,
   onResult,
+  sections,
+  docked = false,
 }: {
   onClose: () => void;
-  onResult: (body: BlockNode[], mode: "append" | "replace") => void;
+  onResult: (body: BlockNode[], target: InsertTarget) => void;
+  /** Top-level sections of the current note, for the "nest under…" insert target. */
+  sections: { path: string; label: string }[];
+  docked?: boolean;
 }) {
   const [text, setText] = useState("");
   const [ext, setExt] = useState<string>(".txt");
@@ -49,6 +66,9 @@ export function ImportDialog({
   const [importError, setImportError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState<"preview" | "json">("preview");
+  // Insert target, encoded: "append" | "replace" | "section:<path>".
+  const [target, setTarget] = useState("append");
+  const [inserted, setInserted] = useState<string | null>(null);
 
   // Set the working tree + mirror it into the editable JSON pane.
   const setGenerated = (next: BlockNode[]) => {
@@ -124,10 +144,25 @@ export function ImportDialog({
   );
 
   const ready = Boolean(body && body.length && !jsonError);
-  const apply = (mode: "append" | "replace") => {
+  const decodeTarget = (): InsertTarget =>
+    target === "replace"
+      ? { mode: "replace" }
+      : target.startsWith("section:")
+        ? { mode: "section", path: target.slice("section:".length) }
+        : { mode: "append" };
+
+  const apply = () => {
     if (!ready || !body) return;
-    onResult(body, mode);
-    onClose();
+    const n = countBlocks(body);
+    onResult(body, decodeTarget());
+    if (docked) {
+      // Stay open for the next paste; clear the source so it's ready to reuse.
+      setInserted(`Inserted ${n} block${n === 1 ? "" : "s"} ✓`);
+      setText("");
+      window.setTimeout(() => setInserted(null), 2500);
+    } else {
+      onClose();
+    }
   };
 
   const status = busy
@@ -136,87 +171,110 @@ export function ImportDialog({
       ? "parse error"
       : jsonError
         ? "JSON invalid"
-        : body && body.length
-          ? `${countBlocks(body)} blocks`
-          : "paste to preview";
+        : inserted
+          ? inserted
+          : body && body.length
+            ? `${countBlocks(body)} blocks`
+            : "paste to preview";
 
+  const inner = (
+    <>
+      <div className="importHead">
+        <h2>{docked ? "Paste notes" : "Import raw notes"}</h2>
+        <label className="field inline">
+          <span>Language</span>
+          <select value={ext} onChange={(e) => setExt(e.target.value)}>
+            {EXTS.map(([e, label]) => (
+              <option key={e} value={e}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span className="spacer" />
+        <span className="hint">{status}</span>
+        {docked && (
+          <button className="tiny" title="Close paste pane" onClick={onClose}>
+            ✕
+          </button>
+        )}
+      </div>
+
+      <div className={`importPanes ${docked ? "dock" : ""}`}>
+        <div className="importPane">
+          <div className="paneHead">Source</div>
+          <textarea
+            className="mono importArea"
+            placeholder={"Paste raw notes here…\n\nTopic\n    Subtopic\n    ```python\n    print('x')\n    ```"}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+          {importError && <div className="paneError">{importError}</div>}
+        </div>
+
+        <div className="importPane">
+          <div className="paneHead">
+            Generated
+            <span className="spacer" />
+            <button className={`tiny ${view === "preview" ? "primary" : ""}`} onClick={() => setView("preview")}>
+              Preview
+            </button>
+            <button className={`tiny ${view === "json" ? "primary" : ""}`} onClick={() => setView("json")}>
+              JSON (editable)
+            </button>
+          </div>
+
+          {view === "json" ? (
+            <textarea
+              className="mono importArea"
+              spellCheck={false}
+              placeholder="Generated block JSON appears here once you paste source."
+              value={jsonText}
+              onChange={(e) => onJsonChange(e.target.value)}
+            />
+          ) : (
+            <div className="paneBody">
+              {!body?.length && <p className="hint">Nothing parsed yet.</p>}
+              {body?.length ? <Preview note={previewNote} /> : null}
+            </div>
+          )}
+          {jsonError && <div className="paneError">{jsonError}</div>}
+        </div>
+      </div>
+
+      <p className="hint">
+        Indentation becomes the outline tree; <code>```</code> fences become code blocks. Edit
+        the source <em>or</em> the JSON until it looks right (the other view follows), then
+        insert — and enrich further in the editor.
+      </p>
+
+      <div className="modalActions">
+        {!docked && <button onClick={onClose}>Cancel</button>}
+        <label className="field inline">
+          <span>Insert</span>
+          <select value={target} onChange={(e) => setTarget(e.target.value)}>
+            <option value="append">at end of note</option>
+            <option value="replace">replace whole body</option>
+            {sections.map((s) => (
+              <option key={s.path} value={`section:${s.path}`}>
+                under: {s.label || `section ${Number(s.path) + 1}`}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span className="spacer" />
+        <button className="primary" disabled={!ready} onClick={apply}>
+          Insert
+        </button>
+      </div>
+    </>
+  );
+
+  if (docked) return <aside className="importDock">{inner}</aside>;
   return (
     <div className="modalOverlay" onClick={onClose}>
       <div className="modal importModal" onClick={(e) => e.stopPropagation()}>
-        <div className="importHead">
-          <h2>Import raw notes</h2>
-          <label className="field inline">
-            <span>Language</span>
-            <select value={ext} onChange={(e) => setExt(e.target.value)}>
-              {EXTS.map(([e, label]) => (
-                <option key={e} value={e}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <span className="spacer" />
-          <span className="hint">{status}</span>
-        </div>
-
-        <div className="importPanes">
-          <div className="importPane">
-            <div className="paneHead">Source</div>
-            <textarea
-              className="mono importArea"
-              placeholder={"Paste raw notes here…\n\nTopic\n    Subtopic\n    ```python\n    print('x')\n    ```"}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-            />
-            {importError && <div className="paneError">{importError}</div>}
-          </div>
-
-          <div className="importPane">
-            <div className="paneHead">
-              Generated
-              <span className="spacer" />
-              <button className={`tiny ${view === "preview" ? "primary" : ""}`} onClick={() => setView("preview")}>
-                Preview
-              </button>
-              <button className={`tiny ${view === "json" ? "primary" : ""}`} onClick={() => setView("json")}>
-                JSON (editable)
-              </button>
-            </div>
-
-            {view === "json" ? (
-              <textarea
-                className="mono importArea"
-                spellCheck={false}
-                placeholder="Generated block JSON appears here once you paste source."
-                value={jsonText}
-                onChange={(e) => onJsonChange(e.target.value)}
-              />
-            ) : (
-              <div className="paneBody">
-                {!body?.length && <p className="hint">Nothing parsed yet.</p>}
-                {body?.length ? <Preview note={previewNote} /> : null}
-              </div>
-            )}
-            {jsonError && <div className="paneError">{jsonError}</div>}
-          </div>
-        </div>
-
-        <p className="hint">
-          Indentation becomes the outline tree; <code>```</code> fences become code blocks. Edit
-          the source <em>or</em> the JSON until it looks right (the other view follows), then
-          insert — and enrich further in the editor.
-        </p>
-
-        <div className="modalActions">
-          <button onClick={onClose}>Cancel</button>
-          <span className="spacer" />
-          <button disabled={!ready} onClick={() => apply("append")}>
-            Append to note
-          </button>
-          <button className="primary" disabled={!ready} onClick={() => apply("replace")}>
-            Replace body
-          </button>
-        </div>
+        {inner}
       </div>
     </div>
   );

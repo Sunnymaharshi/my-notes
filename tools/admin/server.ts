@@ -7,6 +7,11 @@
  *
  * Routes (all under /api):
  *   GET    /api/categories            -> categories.json
+ *   PUT    /api/categories            -> validate + replace categories.json
+ *                                        ({categories,renames?}: renames cascade into notes;
+ *                                        deleting a still-referenced category is blocked, 409)
+ *   GET    /api/domains               -> domains.json
+ *   PUT    /api/domains               -> validate + replace domains.json
  *   GET    /api/notes                 -> [{id,title,category,labels,summary,draft,updated}]
  *   GET    /api/notes/:id             -> raw note JSON (un-highlighted, for editing)
  *   POST   /api/notes                 -> create skeleton {id,title,category} (draft)
@@ -20,13 +25,21 @@ import type { Plugin } from "vite";
 import { promises as fs } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
-import { NoteSchema, type Note, type NoteMeta } from "../../src/lib/schema.ts";
+import {
+  NoteSchema,
+  CategorySchema,
+  DomainSchema,
+  type Note,
+  type NoteMeta,
+} from "../../src/lib/schema.ts";
 import { findDuplicates } from "../../src/lib/dupes.ts";
 import { parse, EXT_LANG, slugify } from "../convert/parse.ts";
 
 const root = process.cwd();
 const contentDir = path.join(root, "content");
 const notesDir = path.join(contentDir, "notes");
+const categoriesPath = path.join(contentDir, "categories.json");
+const domainsPath = path.join(contentDir, "domains.json");
 
 const json = (res: ServerResponse, data: unknown, status = 200) => {
   res.statusCode = status;
@@ -98,9 +111,80 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<boolea
   if (!p.startsWith("/api/")) return false;
   const method = req.method ?? "GET";
 
-  // /api/categories
+  // /api/categories  (read + replace whole list)
   if (p === "/api/categories" && method === "GET") {
-    json(res, JSON.parse(await fs.readFile(path.join(contentDir, "categories.json"), "utf8")));
+    json(res, JSON.parse(await fs.readFile(categoriesPath, "utf8")));
+    return true;
+  }
+  if (p === "/api/categories" && method === "PUT") {
+    // Body is either a bare Category[] or { categories, renames } — `renames` maps an
+    // old category id to its new id so the rename can cascade into referencing notes
+    // (rather than reading as a delete-of-old + add-of-new and tripping the orphan guard).
+    const body = await readBody(req);
+    const incoming = Array.isArray(body) ? body : body?.categories;
+    const renames: Record<string, string> =
+      (!Array.isArray(body) && body?.renames) || {};
+    const parsed = CategorySchema.array().safeParse(incoming);
+    if (!parsed.success) {
+      json(res, { error: "validation", issues: parsed.error.issues }, 422);
+      return true;
+    }
+    const ids = parsed.data.map((c) => c.id);
+    const dupId = ids.find((id, i) => ids.indexOf(id) !== i);
+    if (dupId) return json(res, { error: `Duplicate category id "${dupId}"` }, 422), true;
+    const domains = DomainSchema.array().parse(JSON.parse(await fs.readFile(domainsPath, "utf8")));
+    const domainIds = new Set(domains.map((d) => d.id));
+    const bad = parsed.data.find((c) => !domainIds.has(c.domain));
+    if (bad) {
+      return json(res, { error: `Category "${bad.id}" references unknown domain "${bad.domain}"` }, 422), true;
+    }
+    // A note's category after applying any rename; orphaned if it still isn't a real id.
+    const newIds = new Set(parsed.data.map((c) => c.id));
+    const effective = (cat: string) =>
+      cat in renames && renames[cat] !== cat ? renames[cat] : cat;
+    const metas = await listMeta();
+    const orphaned = new Map<string, string[]>();
+    for (const n of metas) {
+      if (!newIds.has(effective(n.category))) {
+        (orphaned.get(n.category) ?? orphaned.set(n.category, []).get(n.category)!).push(n.id);
+      }
+    }
+    // Guard deletion: refuse to drop a category that notes still reference (the build
+    // would otherwise fail later with "unknown category"). Reassign or rename instead.
+    if (orphaned.size > 0) {
+      const detail = [...orphaned]
+        .map(([cat, notes]) => `"${cat}" (${notes.join(", ")})`)
+        .join("; ");
+      return json(res, { error: `Cannot remove category still used by notes: ${detail}. Reassign those notes first.` }, 409), true;
+    }
+    // Safe to write: cascade renames into referencing notes, then persist the catalog.
+    for (const n of metas) {
+      if (effective(n.category) === n.category) continue;
+      const raw: any = await readNote(n.id);
+      raw.category = effective(raw.category);
+      await fs.writeFile(path.join(notesDir, n.id, "index.json"), JSON.stringify(raw, null, 2) + "\n");
+    }
+    await fs.writeFile(categoriesPath, JSON.stringify(parsed.data, null, 2) + "\n");
+    json(res, parsed.data);
+    return true;
+  }
+
+  // /api/domains  (read + replace whole list)
+  if (p === "/api/domains" && method === "GET") {
+    json(res, JSON.parse(await fs.readFile(domainsPath, "utf8")));
+    return true;
+  }
+  if (p === "/api/domains" && method === "PUT") {
+    const parsed = DomainSchema.array().safeParse(await readBody(req));
+    if (!parsed.success) {
+      json(res, { error: "validation", issues: parsed.error.issues }, 422);
+      return true;
+    }
+    const ids = parsed.data.map((d) => d.id);
+    const dupId = ids.find((id, i) => ids.indexOf(id) !== i);
+    if (dupId) return json(res, { error: `Duplicate domain id "${dupId}"` }, 422), true;
+    await fs.writeFile(domainsPath, JSON.stringify(parsed.data, null, 2) + "\n");
+    json(res, parsed.data);
     return true;
   }
 

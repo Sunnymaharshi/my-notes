@@ -2,6 +2,7 @@ import { Fragment, type ReactNode } from "react";
 import type { BlockNode, Note, OutlineNode } from "../../lib/schema.ts";
 import { CodeBlock } from "../blocks/CodeBlock.tsx";
 import { Callout } from "../blocks/Callout.tsx";
+import { TextBlock } from "../blocks/TextBlock.tsx";
 import { TableBlock } from "../blocks/TableBlock.tsx";
 import { Flashcard } from "../blocks/Flashcard.tsx";
 import { ImageBlock } from "../blocks/ImageBlock.tsx";
@@ -20,6 +21,8 @@ function nonOutline(node: BlockNode, key: number): ReactNode {
       return <CodeBlock key={key} node={node} />;
     case "callout":
       return <Callout key={key} node={node} />;
+    case "text":
+      return <TextBlock key={key} node={node} />;
     case "table":
       return <TableBlock key={key} node={node} />;
     case "flashcard":

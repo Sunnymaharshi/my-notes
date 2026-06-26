@@ -1,6 +1,6 @@
 /** Note envelope editor (PLAN §7): id/title/category/labels/summary/difficulty/related/draft. */
 import { useState } from "react";
-import type { Category, Difficulty, Note } from "../../src/lib/schema.ts";
+import type { Category, Difficulty, Domain, Note } from "../../src/lib/schema.ts";
 
 const DIFFICULTIES: Difficulty[] = ["beginner", "intermediate", "advanced"];
 
@@ -8,14 +8,29 @@ export function EnvelopeForm({
   note,
   onChange,
   categories,
+  domains,
   allLabels,
 }: {
   note: Note;
   onChange: (patch: Partial<Note>) => void;
   categories: Category[];
+  domains: Domain[];
   allLabels: string[];
 }) {
   const [labelDraft, setLabelDraft] = useState("");
+
+  // Categories grouped under their domain for the picker. Unknown-domain categories
+  // are bucketed under "Other" so nothing disappears.
+  const orderedDomains = [...domains].sort((a, b) => a.order - b.order);
+  const known = new Set(domains.map((d) => d.id));
+  const groups = orderedDomains
+    .map((d) => ({ label: d.label, cats: categories.filter((c) => c.domain === d.id) }))
+    .filter((g) => g.cats.length > 0);
+  const orphans = categories.filter((c) => !known.has(c.domain));
+  if (orphans.length) groups.push({ label: "Other", cats: orphans });
+
+  const selectedCat = categories.find((c) => c.id === note.category);
+  const selectedDomain = domains.find((d) => d.id === selectedCat?.domain);
 
   const addLabel = (raw: string) => {
     const l = raw.trim();
@@ -37,15 +52,19 @@ export function EnvelopeForm({
           <input value={note.id} onChange={(e) => onChange({ id: e.target.value })} />
         </label>
         <label className="field">
-          <span>Category</span>
+          <span>Category{selectedDomain ? ` · ${selectedDomain.label}` : ""}</span>
           <select value={note.category} onChange={(e) => onChange({ category: e.target.value })}>
             {!categories.some((c) => c.id === note.category) && (
               <option value={note.category}>{note.category}</option>
             )}
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.label}
-              </option>
+            {groups.map((g) => (
+              <optgroup key={g.label} label={g.label}>
+                {g.cats.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </label>

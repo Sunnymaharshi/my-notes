@@ -15,6 +15,12 @@
     "validate": "tsx scripts/build-content.ts --check"
   },
   "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@fontsource/ibm-plex-sans": "^5.2.8",
+    "@fontsource/ibm-plex-serif": "^5.2.7",
+    "@fontsource/inter": "^5.2.8",
+    "@radix-ui/react-dialog": "^1.1.17",
+    "@radix-ui/react-tooltip": "^1.2.10",
     "cmdk": "^1.1.1",
     "framer-motion": "^11.18.2",
     "minisearch": "^7.2.0",

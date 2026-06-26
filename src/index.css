@@ -1,26 +1,143 @@
+/* ============================================================================
+ * Field Manual — design tokens
+ *
+ * A developer's revision-and-reference handbook: calm editorial typography on a
+ * warm sepia ink, with one signature accent — golden-clay highlighter — for
+ * marks, the active topic, and search hits. Light mode is a warm cream paper.
+ *
+ * Components reference these tokens (var(--…)), so this layer is the single
+ * source of truth for the whole site's look.
+ * ========================================================================== */
+
+/* Typeface — a single family everywhere: Inter (UI, prose, headings, labels),
+ * purpose-built for on-screen legibility. Only code stays monospace (IBM Plex
+ * Mono) since alignment needs it. Loaded weight-by-weight from fontsource. */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+
 :root,
 :root[data-theme="dark"] {
-  --bg: #0d1117;
-  --bg-elev: #161b22;
-  --bg-elev-2: #1c2330;
-  --border: #2a3340;
-  --text: #e6edf3;
-  --text-dim: #8b949e;
-  --accent: #58a6ff;
-  --code-bg: #0b0f14;
+  /* surfaces — warm sepia ink (Claude-ish), three elevations; lifted off
+     pure-black to soften halation while keeping high text contrast */
+  --bg: #1a1613;
+  --bg-elev: #221d18;
+  --bg-elev-2: #2c2620;
+  --bg-inset: #141009;
+  --border: #352e25;
+  --border-strong: #463d31;
+
+  /* text — warm off-white; higher-contrast mid/dim tiers keep body legible */
+  --text: #f8f3ea;
+  --text-mid: #e2d9cb;
+  --text-dim: #b8ac99;
+  --text-faint: #8a7d6a;
+
+  /* signature accent — warm golden-clay highlighter (marks, active topic, hits) */
+  --hl: #eba24f;
+  --hl-strong: #df8a2e;
+  --hl-soft: rgba(235, 162, 79, 0.15);
+  --hl-line: rgba(235, 162, 79, 0.4);
+  --on-hl: #241704;
+
+  /* secondary accent — warm terracotta (links, focus, info) */
+  --accent: #d9926a;
+  --accent-soft: rgba(217, 146, 106, 0.14);
+
+  /* semantic */
+  --good: #6cc6a0;
+  --warn: #eba24f;
+  --danger: #e8857a;
+
+  --code-bg: #16110b;
+
   color-scheme: dark;
 }
 
 :root[data-theme="light"] {
-  --bg: #ffffff;
-  --bg-elev: #f6f8fa;
-  --bg-elev-2: #eef1f4;
-  --border: #d6dbe1;
-  --text: #1f2328;
-  --text-dim: #59636e;
-  --accent: #0969da;
-  --code-bg: #f6f8fa;
+  /* warm cream paper (Claude-ish), deliberately not cool */
+  --bg: #f4f0e7;
+  --bg-elev: #fcfaf4;
+  --bg-elev-2: #ebe5d7;
+  --bg-inset: #ece6d8;
+  --border: #e2dac9;
+  --border-strong: #cfc5b0;
+
+  --text: #201b13;
+  --text-mid: #413a2e;
+  --text-dim: #5f5645;
+  --text-faint: #8a7e6a;
+
+  --hl: #b16a25;
+  --hl-strong: #95571a;
+  --hl-soft: rgba(177, 106, 37, 0.13);
+  --hl-line: rgba(177, 106, 37, 0.42);
+  --on-hl: #ffffff;
+
+  --accent: #b35e36;
+  --accent-soft: rgba(179, 94, 54, 0.1);
+
+  --good: #1a8a5f;
+  --warn: #b16a25;
+  --danger: #bf3a2a;
+
+  --code-bg: #efe9db;
+
   color-scheme: light;
+}
+
+:root {
+  /* type roles */
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* serif + mono roles now share the one UI font, so the whole site is Inter;
+     only --font-code stays monospace (used by code blocks, inline code, kbd). */
+  --font-serif: var(--font-sans);
+  --font-mono: var(--font-sans);
+  --font-code: "IBM Plex Mono", "SF Mono", ui-monospace, Menlo, monospace;
+
+  /* type scale (1.250 major-third) */
+  --step--1: 0.82rem;
+  --step-0: 1rem;
+  --step-1: 1.15rem;
+  --step-2: 1.34rem;
+  --step-3: 1.66rem;
+  --step-4: 2.1rem;
+  --step-5: 2.6rem;
+
+  /* spacing */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 36px;
+  --sp-7: 56px;
+
+  /* radius */
+  --r-sm: 6px;
+  --r-md: 9px;
+  --r-lg: 13px;
+  --r-xl: 18px;
+
+  /* elevation */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.18);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.28);
+  --shadow-3: 0 24px 70px rgba(0, 0, 0, 0.5);
+
+  /* motion */
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-1: 0.12s;
+  --dur-2: 0.22s;
+  --dur-3: 0.4s;
+
+  /* layout */
+  --sidebar-w: 286px;
+  --measure: 74ch;
 }
 
 * {
@@ -37,13 +154,90 @@ body,
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-size: 15px;
-  line-height: 1.55;
+  font-family: var(--font-sans);
+  font-size: var(--step-0);
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.012em;
 }
 
 code,
-pre {
-  font-family: "SF Mono", ui-monospace, "Cascadia Code", Menlo, monospace;
+pre,
+kbd {
+  font-family: var(--font-code);
   font-size: 0.86em;
+  font-feature-settings: "liga" 0;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+::selection {
+  background: var(--hl-soft);
+  color: var(--text);
+}
+
+/* Visible, consistent keyboard focus — quality floor. */
+:focus-visible {
+  outline: 2px solid var(--hl);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* Slim, themed scrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+  background-clip: content-box;
+}
+
+/* Block-node anchors (id="n1.2") are scroll targets for search + the spine. */
+[id^="n"] {
+  scroll-margin-top: var(--sp-5);
+}
+
+/* A utility eyebrow used across UI chrome (mono, tracked, uppercase). */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

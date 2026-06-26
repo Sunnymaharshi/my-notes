@@ -3,6 +3,7 @@ import { nodeAnchorId } from "../../lib/search.ts";
 import { OutlineNode } from "./OutlineNode.tsx";
 import { CodeBlock } from "./CodeBlock.tsx";
 import { Callout } from "./Callout.tsx";
+import { TextBlock } from "./TextBlock.tsx";
 import { TableBlock } from "./TableBlock.tsx";
 import { Flashcard } from "./Flashcard.tsx";
 import { ImageBlock } from "./ImageBlock.tsx";
@@ -15,6 +16,8 @@ function render(node: BlockNode, path: string) {
       return <CodeBlock node={node} />;
     case "callout":
       return <Callout node={node} />;
+    case "text":
+      return <TextBlock node={node} />;
     case "table":
       return <TableBlock node={node} />;
     case "flashcard":

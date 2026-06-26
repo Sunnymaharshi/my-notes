@@ -1,20 +1,20 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(1, 4, 9, 0.6);
-  backdrop-filter: blur(2px);
+  background: rgba(5, 8, 12, 0.58);
+  backdrop-filter: blur(3px);
   z-index: 50;
-  animation: fade 0.12s ease-out;
+  animation: fade var(--dur-2) ease-out;
 }
 
 .dialog {
   position: fixed;
-  top: 14vh;
+  top: 13vh;
   left: 50%;
   transform: translateX(-50%);
-  width: min(640px, calc(100vw - 32px));
+  width: min(660px, calc(100vw - 28px));
   z-index: 51;
-  animation: pop 0.14s ease-out;
+  animation: pop var(--dur-2) var(--ease-out);
 }
 
 @keyframes fade {
@@ -26,61 +26,113 @@
 @keyframes pop {
   from {
     opacity: 0;
-    transform: translate(-50%, 6px);
+    transform: translate(-50%, 10px) scale(0.985);
   }
 }
 
 .command {
   display: flex;
   flex-direction: column;
-  max-height: 60vh;
+  max-height: 62vh;
   background: var(--bg-elev);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-3);
   overflow: hidden;
 }
 
-.input {
-  width: 100%;
-  border: none;
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 0 var(--sp-4);
   border-bottom: 1px solid var(--border);
+}
+
+.inputIcon {
+  color: var(--text-faint);
+  font-size: 18px;
+}
+
+.input {
+  flex: 1;
+  border: none;
   background: transparent;
   color: var(--text);
-  font: inherit;
-  font-size: 16px;
-  padding: 16px 18px;
+  font-family: var(--font-sans);
+  font-size: var(--step-1);
+  padding: 16px 0;
   outline: none;
 }
 
 .input::placeholder {
-  color: var(--text-dim);
+  color: var(--text-faint);
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--hl);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .list {
   overflow-y: auto;
-  padding: 6px;
+  padding: var(--sp-2);
 }
 
 .group :global([cmdk-group-heading]) {
+  font-family: var(--font-mono);
   text-transform: uppercase;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  color: var(--text-dim);
-  padding: 8px 10px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--text-faint);
+  padding: var(--sp-3) 10px var(--sp-1);
+}
+
+.groupHeadRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.clearBtn {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+.clearBtn:hover {
+  color: var(--hl);
 }
 
 .item {
   display: block;
   padding: 9px 11px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   cursor: pointer;
-  scroll-margin: 8px;
+  scroll-margin: var(--sp-2);
 }
 
 /* cmdk sets aria-selected on the highlighted item (keyboard + hover). */
-.item[aria-selected="true"] {
+.item[aria-selected="true"],
+.recentItem[aria-selected="true"] {
   background: var(--bg-elev-2);
+  box-shadow: inset 2px 0 0 var(--hl);
 }
 
 .itemHead {
@@ -91,17 +143,33 @@
 
 .itemTitle {
   font-weight: 600;
-  font-size: 15px;
+  font-size: var(--step-0);
+}
+
+.mark {
+  background: var(--hl-soft);
+  color: var(--text);
+  border-radius: 3px;
+  padding: 0 1px;
+  font-weight: 700;
+}
+
+.noteCtx {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  flex-shrink: 0;
 }
 
 .cat {
   margin-left: auto;
   flex-shrink: 0;
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   color: var(--text-dim);
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 1px 9px;
+  padding: 2px 9px;
 }
 
 .snippet {
@@ -113,27 +181,45 @@
   white-space: nowrap;
 }
 
+.recentItem {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 8px 11px;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  color: var(--text-mid);
+  font-size: var(--step-0);
+}
+
+.recentIcon {
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
 .empty {
   color: var(--text-dim);
   font-size: 14px;
-  padding: 18px 12px;
+  padding: 22px 12px;
   text-align: center;
 }
 
 .footer {
   display: flex;
-  gap: 16px;
-  padding: 8px 14px;
+  gap: var(--sp-4);
+  padding: 9px 15px;
   border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--text-dim);
+  color: var(--text-faint);
 }
 
 .footer kbd {
-  font-family: inherit;
+  font-family: var(--font-mono);
   background: var(--bg-elev-2);
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 0 5px;
   margin-right: 2px;
+  color: var(--text-dim);
 }

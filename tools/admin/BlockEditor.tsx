@@ -14,6 +14,7 @@ import type {
   ImageNode,
   OutlineNode,
   TableNode,
+  TextNode,
 } from "../../src/lib/schema.ts";
 import type { DupeGroup } from "../../src/lib/dupes.ts";
 import { api } from "./api.ts";
@@ -29,7 +30,7 @@ import {
 } from "./tree-ops.ts";
 
 const VARIANTS: CalloutVariant[] = ["tip", "warning", "info", "note", "gotcha"];
-const TYPES: BlockNode["type"][] = ["outline", "code", "callout", "table", "flashcard", "image"];
+const TYPES: BlockNode["type"][] = ["outline", "text", "code", "callout", "table", "flashcard", "image"];
 
 function newNode(type: BlockNode["type"]): BlockNode {
   switch (type) {
@@ -39,6 +40,8 @@ function newNode(type: BlockNode["type"]): BlockNode {
       return { type: "code", lang: "text", code: "" };
     case "callout":
       return { type: "callout", variant: "note", text: "" };
+    case "text":
+      return { type: "text", text: "" };
     case "table":
       return { type: "table", headers: ["", ""], rows: [["", ""]] };
     case "flashcard":
@@ -152,6 +155,8 @@ function NodeFields({
       return <CodeFields node={node} update={update} />;
     case "callout":
       return <CalloutFields node={node} update={update} />;
+    case "text":
+      return <TextFields node={node} update={update} />;
     case "table":
       return <TableFields node={node} update={update} />;
     case "flashcard":
@@ -177,11 +182,26 @@ function OutlineFields({ node, update }: { node: OutlineNode; update: (n: BlockN
         value={node.note ?? ""}
         onChange={(e) => update({ ...node, note: e.target.value || undefined })}
       />
+      <label className="topicToggle" title="Mark as a standalone topic — search results land on the nearest topic">
+        <input
+          type="checkbox"
+          checked={node.role === "topic"}
+          onChange={(e) => update({ ...node, role: e.target.checked ? "topic" : undefined })}
+        />
+        <span>Topic (standalone unit)</span>
+      </label>
     </div>
   );
 }
 
 function CodeFields({ node, update }: { node: CodeNode; update: (n: BlockNode) => void }) {
+  const setHighlight = (raw: string) => {
+    const nums = raw
+      .split(",")
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => Number.isInteger(n) && n >= 1);
+    update({ ...node, highlight: nums.length ? nums : undefined });
+  };
   return (
     <div className="fields">
       <div className="row">
@@ -195,6 +215,11 @@ function CodeFields({ node, update }: { node: CodeNode; update: (n: BlockNode) =
           placeholder="filename (optional)"
           value={node.filename ?? ""}
           onChange={(e) => update({ ...node, filename: e.target.value || undefined })}
+        />
+        <input
+          placeholder="highlight lines (e.g. 2,5)"
+          value={(node.highlight ?? []).join(", ")}
+          onChange={(e) => setHighlight(e.target.value)}
         />
       </div>
       <textarea
@@ -221,6 +246,19 @@ function CalloutFields({ node, update }: { node: CalloutNode; update: (n: BlockN
       <textarea
         rows={2}
         placeholder="Callout text"
+        value={node.text}
+        onChange={(e) => update({ ...node, text: e.target.value })}
+      />
+    </div>
+  );
+}
+
+function TextFields({ node, update }: { node: TextNode; update: (n: BlockNode) => void }) {
+  return (
+    <div className="fields">
+      <textarea
+        rows={4}
+        placeholder="Prose paragraph(s). Blank line = new paragraph."
         value={node.text}
         onChange={(e) => update({ ...node, text: e.target.value })}
       />

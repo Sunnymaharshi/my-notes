@@ -1,9 +1,65 @@
 [
-  { "id": "python", "label": "Python", "color": "#3776ab", "order": 1 },
-  { "id": "javascript", "label": "JavaScript", "color": "#f7df1e", "order": 2 },
-  { "id": "react", "label": "React", "color": "#61dafb", "order": 3 },
-  { "id": "dsa", "label": "DSA", "color": "#16a34a", "order": 4 },
-  { "id": "devops", "label": "DevOps", "color": "#2496ed", "order": 5 },
-  { "id": "system-design", "label": "System Design", "color": "#a855f7", "order": 6 },
-  { "id": "cloud", "label": "Cloud", "color": "#ff9900", "order": 7 }
+  {
+    "id": "react",
+    "label": "React",
+    "domain": "frontend",
+    "color": "#61dafb",
+    "order": 1
+  },
+  {
+    "id": "nextjs",
+    "label": "Next.js",
+    "domain": "frontend",
+    "color": "#ffffff",
+    "order": 2
+  },
+  {
+    "id": "javascript",
+    "label": "JavaScript",
+    "domain": "frontend",
+    "color": "#f7df1e",
+    "order": 3
+  },
+  {
+    "id": "python",
+    "label": "Python",
+    "domain": "backend",
+    "color": "#3776ab",
+    "order": 1
+  },
+  {
+    "id": "node",
+    "label": "Node.js",
+    "domain": "backend",
+    "color": "#3c873a",
+    "order": 2
+  },
+  {
+    "id": "dsa",
+    "label": "DSA",
+    "domain": "backend",
+    "color": "#16a34a",
+    "order": 3
+  },
+  {
+    "id": "system-design",
+    "label": "System Design",
+    "domain": "system-design",
+    "color": "#a855f7",
+    "order": 1
+  },
+  {
+    "id": "devops",
+    "label": "DevOps",
+    "domain": "devops",
+    "color": "#2496ed",
+    "order": 1
+  },
+  {
+    "id": "cloud",
+    "label": "Cloud",
+    "domain": "cloud",
+    "color": "#ff9900",
+    "order": 1
+  }
 ]

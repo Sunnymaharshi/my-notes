@@ -1,46 +1,44 @@
 # CLAUDE.md
 
-Personal **developer-notes website**: a searchable, label-able knowledge base for quick
-reference and pre-interview revision. Author is a senior FE. Existing notes are indented
-outlines in code-comment blocks across several repos (e.g. `fastapi-notes.py`). Full plan in
-`PLAN.md`. Phase 1 (scaffold + schema + content pipeline) is done; see Status below.
+Personal **developer-notes website**: searchable, label-able knowledge base for quick
+reference + pre-interview revision. Author is a senior FE. Full plan in `PLAN.md`. All 6
+phases done; migration is the remaining work (see Status).
 
 ## Locked decisions (don't re-litigate)
 
-1. **Content = structured JSON block-tree**, one note per file (`index.json`). Not Markdown/
-   MDX/HTML. HTML only as build output. Source of truth for the model: `src/lib/schema.ts`
-   (Zod) — validated at build, on admin save, and on import.
-2. **Single content repo.** Old notes migrated in once; all new notes authored here. The
-   site never pulls from the old repos.
-3. **Two authoring paths**, both emit schema-valid JSON: (a) **local admin studio**
-   (`npm run admin`, localhost-only, no DB, never deployed); (b) **conversion** of raw notes
-   → JSON via the deterministic `npm run convert` parser + hand enrichment — procedure in
-   `tools/convert/README.md`. AI is only ever an *external* aid you use by hand on the JSON
-   (labels, summary, wording); nothing in the repo or the deployed site calls a model.
-4. **Display:** collapsible **tree/outline** is default; doc + flashcard views derive from
-   the same tree.
+1. **Content = structured JSON block-tree**, one note per file (`index.json`). Not MD/MDX/HTML
+   (HTML is build output only). Model source of truth: `src/lib/schema.ts` (Zod) — validated
+   at build, admin save, and import.
+2. **Single content repo.** Old notes migrated in once; never pulled from old repos after.
+3. **Two authoring paths**, both emit schema-valid JSON: (a) **admin studio** (`npm run admin`,
+   localhost-only, no DB, never deployed); (b) **conversion** of raw notes → JSON via the
+   deterministic `npm run convert` parser + hand enrichment (`tools/convert/README.md`).
+   AI is only ever an *external/manual* aid on the JSON; nothing in the repo or site calls a model.
+4. **Display:** collapsible **tree/outline** default; doc + flashcard views derive from same tree.
 5. **Stack:** pure client-rendered **React SPA** (no SEO → no SSG/SSR). Vite + React + TS,
    React Router, **CSS Modules** (no Tailwind), **Framer Motion**, **Shiki** (build-time
-   code highlighting, server-side). Planned: **Radix** primitives, **cmdk**, MiniSearch,
-   Zustand/context. Client fetches a note's JSON at runtime; a React serializer renders the
-   block-tree. Static hosting + SPA fallback. Upgrade path if first-paint ever matters:
-   `vite-react-ssg` (non-destructive).
-6. **Search:** custom **MiniSearch index built from the JSON** (no backend). Build step
-   walks each `body`, weights fields by node type, writes a lazy-loaded `search-index.json`;
+   highlighting), **Radix** (`react-tooltip`, `react-dialog`), **cmdk**, **MiniSearch**,
+   Zustand/context. Self-hosted type via `@fontsource`: **Inter** (sans=UI/prose, chosen for
+   on-screen legibility), **IBM Plex Serif** (titles/reading), **IBM Plex Mono** (code+labels).
+   Client fetches a note's JSON at runtime; React serializer
+   renders the block-tree. Static host + SPA fallback. Upgrade path if first-paint matters:
+   `vite-react-ssg` (non-destructive). **UI direction = "Field Manual"** (see `src/index.css`
+   token layer; tokens drive the whole look — edit there, not per-component).
+6. **Search:** custom **MiniSearch index built from JSON** at build (no backend); lazy-loaded,
    queried in-memory with fuzzy/prefix, label+category facets, node-level deep links.
-7. **Performance:** browser loads only the opened note (per-note JSON, lazy by route — never
-   the whole corpus); a slim metadata index (`id,title,category,labels,summary`) loads once
-   for lists/search/Cmd-K; `code` nodes pre-highlighted at build. Don't shorten schema keys
-   (compression handles repetition; keep readable).
+7. **Performance:** load only the opened note (per-note JSON, lazy by route); a slim metadata
+   index (`id,title,category,labels,summary`) loads once for lists/search/Cmd-K; `code`
+   pre-highlighted at build. Don't shorten schema keys (compression handles it; keep readable).
 
 ## Content schema (v1)
 
-Envelope: `id, title, category, labels[], summary, difficulty?, related?[], updated, draft,
-body[]`. `body` = array of typed block nodes:
+Envelope: `id, title, category, labels[], summary, difficulty?, related?[], updated, draft, body[]`.
+`body` = array of typed block nodes:
 
 | type | shape |
 |---|---|
-| `outline` | `{ text, children?[], note? }` (the nested tree) |
+| `outline` | `{ text, children?[], note?, role? }` |
+| `text` | `{ text }` — free-form prose paragraph(s); blank line splits paragraphs |
 | `code` | `{ lang, code, filename?, highlight?[] }` |
 | `image` | `{ src, alt, caption? }` |
 | `callout` | `{ variant, text }` |
@@ -48,85 +46,110 @@ body[]`. `body` = array of typed block nodes:
 | `flashcard` | `{ q, a }` |
 
 `text` is a string in v1, upgradeable to spans+marks later without migrating notes.
-**Extensibility rule:** new capability = new `type` + renderer + editor control; never break
-existing types. Categories are an enum in `content/categories.json`.
+**Extensibility rule:** new capability = new `type` + renderer + editor control; never break existing types.
+
+**Catalog: domain → category → note.** `content/domains.json` = broad domains (frontend,
+backend, system-design, devops, ai, cloud); `content/categories.json` = technologies, each with
+a `domain`. A note's `category` resolves its domain via the catalog (domain not stored on note).
+Both Zod-validated; every reference must resolve to a real entry.
+
+**`role` (outline only):** `role: "topic"` marks a self-contained, showable unit — the deep-link
+target for search. Topics nest freely; "sub-topic" = a topic with a parent topic. Unmarked nodes
+are detail lines in the nearest topic. **Decoupled from indentation depth.** Enum is extensible.
+
+**`highlight?[]` (code):** 1-based line numbers; Shiki tags `.highlighted` at build (no client highlighter).
 
 ## Layout
 
 ```
 content/notes/<id>/index.json   # note source of truth (+ colocated images)
-content/categories.json
+content/categories.json         # technologies, each with a `domain`
+content/domains.json            # broad domains; top of the catalog
 public/content/                 # GENERATED by `npm run content` — do not edit
-scripts/build-content.ts        # validate notes + emit metadata index (prod build)
-tools/dev/content-plugin.ts     # dev: serve notes live from content/ (edit-refresh loop)
-tools/lib/highlight.ts          # Shiki: inject codeHtml into code nodes (build + dev)
-tools/convert/parse.ts          # notes file -> skeleton JSON (deterministic; exports parse())
-tools/convert/README.md         # raw notes -> JSON conversion procedure
+scripts/build-content.ts        # validate notes+domains+categories; emit metadata index
+scripts/dupes.ts                # `npm run dupes` — duplicate report
+tools/dev/content-plugin.ts     # dev: serve notes/categories/domains live from content/
+tools/lib/highlight.ts          # Shiki dual-theme codeHtml + highlight[] tagging
+tools/convert/{parse.ts,README.md}  # notes file -> skeleton JSON (deterministic) + procedure
+tools/admin/                    # local studio (npm run admin): API + block editor + preview
+tools/admin/CatalogDialog.tsx   # edit domains+categories (PUT /api/{domains,categories})
+vite.admin.config.ts            # admin Vite config (port 5174; never deployed)
 TOOLS.md                        # tooling commands + migration guide
-tools/admin/                    # local-only studio (npm run admin): API + block editor + preview
-vite.admin.config.ts            # admin Vite config (port 5174; never built/deployed)
-scripts/dupes.ts                # `npm run dupes` — duplicate report (§7a)
-src/lib/dupes.ts                # duplication detection (shared: CLI + admin flag)
-src/lib/schema.ts               # Zod schema (single source of truth)
+src/lib/schema.ts               # Zod schema (single source of truth): Note + Domain + Category
 src/lib/content.ts              # runtime fetch helpers (memoized) + resolveAsset
-src/lib/tree.ts                 # branch-path collection for expand/collapse
-src/lib/cards.ts                # flashcard collector (explicit cards, else outline `note` pairs)
+src/lib/tree.ts                 # path steps + resolveTopic (nearest-topic climb for deep links)
+src/lib/cards.ts                # flashcard collector (explicit cards, else outline note pairs)
 src/lib/bookmarks.ts            # localStorage bookmark store (useSyncExternalStore)
 src/lib/useTheme.ts             # dark/light theme toggle (bootstrapped in index.html)
-src/lib/useContent.ts           # shared index + categories hook
-src/main.tsx                    # React Router setup
-src/components/Layout.tsx       # sidebar (theme toggle + bookmarks) + <Outlet>
-src/components/NoteView.tsx     # note header + bookmark star + Outline/Document/Flashcards switcher
-src/components/views/           # TreeView (outline) / DocView (doc) / FlashcardView (study deck)
+src/lib/useContent.ts           # shared index+categories+domains hook (+ catalog helpers)
+src/lib/dupes.ts                # duplication detection (shared: CLI + admin flag)
+src/lib/search.ts               # MiniSearch config + per-note doc walker + runSearch
+src/index.css                   # design-token layer ("Field Manual"): color/type/space/motion + base
+src/main.tsx                    # Router + MotionConfig(reducedMotion) + Radix Tooltip provider
+src/components/Layout.tsx       # sidebar (domain→category→notes) + theme/bookmarks + mobile drawer
+src/components/NoteView.tsx     # header + bookmark + view switcher + reading-column/spine grid + Related
+src/components/OutlineSpine.tsx # signature: sticky "On this page" TOC w/ scroll-spy + copy-deep-link
+src/components/CommandPalette.tsx # Cmd-K search: term highlighting + recent searches (localStorage)
+src/components/ui/Tooltip.tsx   # Radix tooltip wrapper (icon-button labels); provider in main.tsx
+src/components/views/           # TreeView / DocView / FlashcardView / TopicView
 src/components/blocks/          # one renderer per node type + TreeContext/NoteContext
 src/pages/                      # Home / Category / Note / Label
 ```
 
-Commands: `npm run content` (validate + generate), `npm run convert -- <file> [--write]`
-(parse a notes file), `npm run admin` (local studio), `npm run dupes` (duplicate report),
-`npm run dev`, `npm run build`, `npm run validate` (check only).
+Commands: `npm run content` (validate+generate), `npm run convert -- <file> [--write]`,
+`npm run admin`, `npm run dupes`, `npm run dev`, `npm run build`, `npm run validate` (check only).
 
 ## Conventions
 
-- Schema-first: change `schema.ts` before its consumers (renderer, admin, conversion).
-- Converting notes → JSON: fence code in the source, run `npm run convert` for the faithful
-  structural parse (deterministic — don't AI-transcribe whole files), then enrich the JSON.
-  Full procedure in `tools/convert/README.md`; it must pass `npm run content`.
-- Migration (done near project end): see `TOOLS.md`. Rule: `category` = the technology (the
-  root), `id` = the note. A technology spanning multiple files → either multiple notes under
-  one `--category`, or one merged note via `npm run convert -- <file> --append <id>`.
-- Keep production static and DB-free; only the admin runs locally/stateful.
-- Dev serves notes live from `content/` (drafts shown, schema errors logged but tolerated);
-  prod build (`npm run content`) is strict and **excludes `draft: true` notes**.
-- Match existing code style. Don't commit/push unless asked.
+- **Schema-first:** change `schema.ts` before its consumers (renderer, admin, conversion).
+- **Converting:** fence code in source, run `npm run convert` for the faithful structural parse
+  (don't AI-transcribe whole files), then enrich. Must pass `npm run content`.
+- **Migration** (TOOLS.md): `category` = technology (root), `id` = note. Multi-file tech →
+  multiple notes under one `--category`, or one merged note via `--append <id>`.
+- **Dev vs prod:** dev serves live from `content/` (drafts shown, schema errors tolerated/logged);
+  prod `npm run content` is strict and **excludes `draft: true`**.
+- **Catalog edits** via admin "Manage catalog" or by hand. **Renaming a category's id cascades**
+  into every referencing note (admin sends `{categories,renames}`). Deleting a category notes
+  still reference is **blocked by the admin** (409, lists the orphaned notes — reassign/rename
+  first); a by-hand edit still surfaces as `unknown category` on next `npm run content`. (Same
+  for removing a domain a category points at — caught at build.)
+- **Topics:** mark self-contained units with `role: "topic"` (admin Topic checkbox). `npm run
+  convert` auto-seeds topics on depth 0–1 branches; refine by hand. Search deep-links resolve UP
+  to nearest topic; untagged notes fall back to "nearest outline-with-children".
+- **Deploy:** `public/content/` is gitignored build output; deploy runs `npm run build`, whose
+  `prebuild` hook (`npm run content`) regenerates it. No generated files in git.
+- Keep production static + DB-free; only admin runs locally/stateful. Match existing code style.
+  Don't commit/push unless asked.
 
 ## Status
 
-- **Phase 1 done:** Vite + React + TS SPA; Zod schema; content build/validation; dev
-  live-serve plugin; `npm run convert` parser; `fastapi` note converted.
-- **Phase 2 done:** React Router (Home/Category/Note/Label); component-per-node block
-  renderer; animated collapsible TreeView (Framer Motion) with Expand/Collapse/Revision;
-  Shiki build-time highlighting (server-side, no client highlighter); images + asset
-  resolution; copy-code; click-to-reveal flashcards.
-- **Phase 3 done:** MiniSearch search built at build/dev from the note JSON
-  (`public/content/search-index.json`); shared config + per-note doc walker in
-  `src/lib/search.ts` (weighted fields, prefix+fuzzy, label/category facet filters);
-  Cmd-K / `/` command palette (cmdk) with node-level deep-links; rendered blocks carry
-  `id="n<path>"` anchors and NoteView force-expands + flashes a deep-linked node; home
-  label cloud; faceted LabelPage (co-occurring-label AND facets + in-facet text search).
-- **Phase 4 done:** local admin studio (`npm run admin`, `vite.admin.config.ts`, port 5174,
-  never deployed) — Node API over `content/notes/` (`tools/admin/server.ts`) + three-pane
-  React UI (note list · envelope form + recursive block editor · live preview via the real
-  `NoteView`); save validates with the shared Zod schema; labels autocomplete; image upload;
-  import-from-txt via the deterministic `parse()` (append/replace). Duplication detection
-  (§7a): `src/lib/dupes.ts` (shared) + `npm run dupes` CLI + per-node ⚠ flag in the admin.
-  No model is called in the repo or site; AI is an external/manual aid only.
-- **Phase 5 done:** learning UX — NoteView is an Outline/Document/Flashcards view switcher
-  (`src/components/views/`); `DocView` renders the tree as a flowing doc; `FlashcardView` is a
-  keyboard-driven study deck (←/→ navigate, Space/Enter flip, `s` shuffle) from explicit
-  `flashcard` nodes, falling back to outline `note` pairs (`src/lib/cards.ts`); bookmarks
-  persist to localStorage (`src/lib/bookmarks.ts` — star in note header + sidebar list);
-  dark/light theme toggle (`src/lib/useTheme.ts`, FOUC-free bootstrap in `index.html`, defaults
-  to system). No model is called anywhere.
-- **Next (Phase 6):** migration (near project end) — bulk-convert the remaining repo notes per
-  `TOOLS.md`. Only `fastapi` note exists so far (user migrates the rest near the end).
+All phases done: (1) Vite+React+TS SPA, Zod schema, content build/validation, dev live-serve,
+convert parser. (2) Router (Home/Category/Note/Label), component-per-node renderer, animated
+collapsible TreeView + revision mode, Shiki build-time highlighting, images, copy-code,
+click-to-reveal flashcards. (3) MiniSearch search (weighted fields, prefix+fuzzy, label/category
+facets), Cmd-K/`/` palette with node-level deep-links, anchors + force-expand/flash, label cloud,
+faceted LabelPage. (4) Admin studio (three-pane: list · form+block editor · live preview via real
+NoteView; Zod-validated save; labels autocomplete; image upload; import-from-txt via `parse()`);
+duplication detection (`src/lib/dupes.ts` + `npm run dupes` CLI + admin ⚠ flag). (5) Learning UX:
+Outline/Document/Flashcards view switcher, keyboard flashcard deck (←/→, Space/Enter flip, `s`
+shuffle), localStorage bookmarks, dark/light theme (FOUC-free). (6) Catalog `domain→category→topic`,
+recursive `topic` role + `resolveTopic` search-click resolution (TopicView flashes matched line +
+"go up" trail), Shiki dual-theme dark code, `highlight[]` lines, `related[]` footer + `updated`
+header, admin topic toggle + catalog CRUD. (7) **UI/UX redesign — "Field Manual"**: IBM Plex type
+system + token layer (`src/index.css`), highlighter-amber signature accent, dark "ink" / light
+"paper" themes, sidebar + mobile drawer, editorial NoteView, **outline-spine TOC** (scroll-spy +
+copy-deep-link, `OutlineSpine.tsx`), search **term-highlighting + recent searches** in the palette,
+Radix tooltips, reduced-motion-aware route/reveal motion.
+
+Only the `fastapi` note exists so far.
+
+### Known issues / future work
+
+- **No tests.** Pure modules (`search.ts`, `tree.ts`, `cards.ts`, `dupes.ts`) are ideal unit targets.
+  `OutlineSpine.collectTopics` (topic walk + fallback) and the palette `highlight` term-splitter
+  are also pure and testable.
+- Done in the redesign (was future work): per-topic "On this page" TOC (`OutlineSpine`) +
+  copy-deep-link; search term-highlighting. **Still open:** prev/next sibling nav (the spine is the
+  natural home), SM-2 spaced repetition, Mermaid block, hover-prefetch, wiki cross-note links
+  (needs spans/marks), print/export-to-Markdown.
+- **Next:** bulk-convert remaining repo notes per `TOOLS.md` (seed role/category/domain).

@@ -7,6 +7,11 @@
   overflow: hidden;
 }
 
+/* When the paste pane is docked: sidebar | paste | editor | preview (4 columns). */
+.app.withDock {
+  grid-template-columns: 240px minmax(320px, 0.8fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+
 /* ---- sidebar ---- */
 .sidebar {
   border-right: 1px solid var(--border);
@@ -31,6 +36,9 @@
   border: 1px solid #5a4300;
   border-radius: 5px;
   padding: 1px 5px;
+}
+.filterBox {
+  width: 100%;
 }
 .noteList {
   list-style: none;
@@ -164,6 +172,18 @@
   align-items: center;
   gap: 8px;
   font-size: 13px;
+}
+.topicToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-dim, #8b949e);
+  width: fit-content;
+  cursor: pointer;
+}
+.topicToggle input {
+  width: auto;
 }
 .chips {
   display: flex;
@@ -385,6 +405,32 @@ button.toggle[data-on="true"] {
   margin: 0;
 }
 
+/* docked paste pane: a persistent left working column (non-modal). */
+.importDock {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 12px;
+  padding: 12px 16px;
+  border-right: 1px solid var(--border);
+  background: var(--bg-elev);
+  overflow: hidden;
+}
+.importDock h2 {
+  margin: 0;
+  font-size: 16px;
+}
+/* stack source over generated when the pane is narrow */
+.importPanes.dock {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr 1fr;
+  height: auto;
+  flex: 1;
+}
+.importDock .modalActions {
+  flex-wrap: wrap;
+}
+
 /* import dialog: source | generated, side by side */
 .importModal {
   width: min(1180px, 96vw);
@@ -462,6 +508,44 @@ button.toggle[data-on="true"] {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+/* ---- catalog dialog (domains + categories) ---- */
+.catalogModal {
+  width: min(1000px, 96vw);
+}
+.catalogCols {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 18px;
+}
+.catalogCol {
+  min-width: 0;
+}
+.catalogRows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.catalogRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.catalogRow input,
+.catalogRow select {
+  min-width: 0;
+  flex: 1;
+}
+.catalogRow .cId {
+  flex: 0 0 90px;
+}
+.catalogRow .cColor {
+  flex: 0 0 80px;
+}
+.catalogRow .cOrder {
+  flex: 0 0 56px;
 }
 .error {
   color: #ff7b72;

@@ -1,10 +1,11 @@
-import type { Category, Note, NoteMeta } from "./schema.ts";
+import type { Category, Domain, Note, NoteMeta } from "./schema.ts";
 
 // Content is served as static JSON from /content (dev: live from source; prod: generated).
 const BASE = "/content";
 
 let indexPromise: Promise<NoteMeta[]> | null = null;
 let categoriesPromise: Promise<Category[]> | null = null;
+let domainsPromise: Promise<Domain[]> | null = null;
 const noteCache = new Map<string, Promise<Note>>();
 
 async function getJSON<T>(url: string, what: string): Promise<T> {
@@ -21,6 +22,11 @@ export function fetchNoteIndex(): Promise<NoteMeta[]> {
 export function fetchCategories(): Promise<Category[]> {
   categoriesPromise ??= getJSON<Category[]>(`${BASE}/categories.json`, "categories");
   return categoriesPromise;
+}
+
+export function fetchDomains(): Promise<Domain[]> {
+  domainsPromise ??= getJSON<Domain[]>(`${BASE}/domains.json`, "domains");
+  return domainsPromise;
 }
 
 export function fetchNote(id: string): Promise<Note> {

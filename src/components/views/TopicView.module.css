@@ -1,0 +1,56 @@
+.topic {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.upbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.up {
+  color: var(--text-dim);
+  text-decoration: none;
+}
+
+.up:hover {
+  color: var(--accent);
+}
+
+.upStep {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sep {
+  color: var(--border);
+}
+
+.heading {
+  margin: 0 0 10px;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+
+.body {
+  font-size: 15px;
+}
+
+.missing {
+  padding: 24px 0;
+  color: var(--text-dim);
+}
+
+.back {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 14px;
+}

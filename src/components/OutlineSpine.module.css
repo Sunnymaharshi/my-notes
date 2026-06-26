@@ -1,0 +1,142 @@
+.spine {
+  font-family: var(--font-sans);
+}
+
+.head {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding: 0 0 var(--sp-3) 14px;
+}
+
+.rail {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-left: 1px solid var(--border);
+}
+
+.item {
+  position: relative;
+}
+
+.link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--step--1);
+  line-height: 1.4;
+  color: var(--text-dim);
+  padding: 5px 24px 5px 16px;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  transition: color var(--dur-1);
+}
+
+.link:hover {
+  color: var(--text);
+}
+
+.depth1 {
+  padding-left: 30px;
+  font-size: 0.78rem;
+}
+
+.active {
+  color: var(--hl);
+  font-weight: 500;
+}
+
+/* the moving dot on the rail (framer layoutId slides it between items) */
+.dot {
+  position: absolute;
+  left: -4px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: var(--hl);
+  box-shadow: 0 0 0 3px var(--hl-soft);
+}
+
+/* per-item copy-deep-link affordance, revealed on hover/focus */
+.copy {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dur-1), color var(--dur-1);
+}
+
+.item:hover .copy,
+.copy:focus-visible {
+  opacity: 1;
+}
+
+.copy:hover {
+  color: var(--hl);
+}
+
+.copied {
+  opacity: 1;
+  color: var(--good);
+}
+
+/* prev/next topic walker — turns the spine into a guided path */
+.steps {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-3);
+  padding-left: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.step {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 4px 9px;
+  cursor: pointer;
+  transition: color var(--dur-1), border-color var(--dur-1);
+}
+
+.step:hover:not(:disabled) {
+  color: var(--hl);
+  border-color: var(--hl-line);
+}
+
+.step:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.stepKbd {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+}

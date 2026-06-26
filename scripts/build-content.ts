@@ -15,7 +15,13 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { NoteSchema, CategorySchema, type Note, type NoteMeta } from "../src/lib/schema.ts";
+import {
+  NoteSchema,
+  CategorySchema,
+  DomainSchema,
+  type Note,
+  type NoteMeta,
+} from "../src/lib/schema.ts";
 import { highlightNote } from "../tools/lib/highlight.ts";
 import { buildSearchIndex } from "../src/lib/search.ts";
 
@@ -105,13 +111,38 @@ async function main() {
     }
   }
 
-  // Validate categories too.
+  // Validate domains + categories, and that every category references a real domain.
+  const domainsRaw = JSON.parse(
+    await fs.readFile(path.join(contentDir, "domains.json"), "utf8"),
+  );
+  const domains = DomainSchema.array().safeParse(domainsRaw);
+  if (!domains.success) {
+    errors.push(`domains.json: ${formatZodError(domains.error)}`);
+  }
+
   const categoriesRaw = JSON.parse(
     await fs.readFile(path.join(contentDir, "categories.json"), "utf8"),
   );
   const categories = CategorySchema.array().safeParse(categoriesRaw);
   if (!categories.success) {
     errors.push(`categories.json: ${formatZodError(categories.error)}`);
+  } else if (domains.success) {
+    const domainIds = new Set(domains.data.map((d) => d.id));
+    for (const c of categories.data) {
+      if (!domainIds.has(c.domain)) {
+        errors.push(`categories.json: category "${c.id}" references unknown domain "${c.domain}"`);
+      }
+    }
+  }
+
+  // Every published note must reference a real category.
+  if (categories.success) {
+    const categoryIds = new Set(categories.data.map((c) => c.id));
+    for (const n of published) {
+      if (!categoryIds.has(n.category)) {
+        errors.push(`note "${n.id}" references unknown category "${n.category}"`);
+      }
+    }
   }
 
   if (errors.length > 0) {
@@ -129,6 +160,7 @@ async function main() {
       path.join(contentDir, "categories.json"),
       path.join(outDir, "categories.json"),
     );
+    await fs.copyFile(path.join(contentDir, "domains.json"), path.join(outDir, "domains.json"));
   }
 
   console.log(

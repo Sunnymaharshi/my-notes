@@ -24,8 +24,12 @@ deck.
     useful. **Keys:** `←/→` prev/next, `Space`/`Enter` flip, `s` shuffle; progress bar.
 - **Search** — custom MiniSearch index built from the note JSON at build time. Fuzzy +
   prefix type-ahead, weighted fields, label/category facets, and **node-level deep links**
-  (a hit jumps to the exact subtopic, auto-expands its ancestors, and flashes it).
-- **Command palette** — `⌘K` / `Ctrl-K` toggles, `/` opens. Jump to any note or search hit.
+  (a hit jumps to the exact subtopic, auto-expands its ancestors, and flashes it). Matched
+  terms are **highlighted** in results.
+- **Command palette** — `⌘K` / `Ctrl-K` toggles, `/` opens. Jump to any note or search hit;
+  remembers your **recent searches**.
+- **On this page (outline spine)** — a sticky topic TOC beside each note that tracks your
+  scroll position live, jumps on click, and **copies a deep link** per topic.
 - **Labels** — clickable label chips, a home-page label cloud, and faceted label pages
   (combine co-occurring labels + in-facet text search).
 - **Bookmarks** — star any note; bookmarks persist to `localStorage`, show in the sidebar,
@@ -42,7 +46,7 @@ deck.
 
   | type | shape |
   |---|---|
-  | `outline` | `{ text, children?[], note? }` — the nested tree |
+  | `outline` | `{ text, children?[], note?, role? }` — the nested tree (`role: "topic"` marks a self-contained, deep-linkable unit) |
   | `code` | `{ lang, code, filename?, highlight?[] }` |
   | `image` | `{ src, alt, caption? }` |
   | `callout` | `{ variant, text }` (`tip\|warning\|info\|note\|gotcha`) |
@@ -69,8 +73,10 @@ deck.
 ## Tech stack
 
 Vite · React 18 + TypeScript · React Router · CSS Modules (no Tailwind) · Framer Motion ·
-Shiki (build-time highlighting) · MiniSearch · cmdk · Zod. No backend, no SSR/SSG (no SEO
-need) — content is static JSON fetched on demand.
+Radix (tooltip/dialog) · Shiki (build-time highlighting) · MiniSearch · cmdk · Zod ·
+IBM Plex via `@fontsource`. No backend, no SSR/SSG (no SEO need) — content is static JSON
+fetched on demand. UI follows the **"Field Manual"** design system whose tokens live in
+`src/index.css` (edit there to re-theme the whole app).
 
 ---
 

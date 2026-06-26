@@ -117,6 +117,12 @@ export function contentDevServer(): Plugin {
               JSON.parse(await fs.readFile(path.join(contentDir, "categories.json"), "utf8")),
             );
           }
+          if (url === "/content/domains.json") {
+            return sendJson(
+              res,
+              JSON.parse(await fs.readFile(path.join(contentDir, "domains.json"), "utf8")),
+            );
+          }
           const m = url.match(/^\/content\/notes\/([^/]+)\/(.+)$/);
           if (m) {
             const file = path.join(notesDir, m[1], m[2]);
