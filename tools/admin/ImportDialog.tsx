@@ -15,7 +15,12 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
-import { BlockNodeSchema, type BlockNode, type Note } from "../../src/lib/schema.ts";
+import {
+  BlockNodeSchema,
+  CURRENT_SCHEMA_VERSION,
+  type BlockNode,
+  type Note,
+} from "../../src/lib/schema.ts";
 import { api } from "./api.ts";
 import { Preview } from "./Preview.tsx";
 
@@ -186,6 +191,7 @@ export function ImportDialog({
 
   const previewNote: Note = useMemo(
     () => ({
+      schemaVersion: CURRENT_SCHEMA_VERSION,
       id: "import-preview",
       title: "Import preview",
       category: "preview",

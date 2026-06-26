@@ -19,6 +19,7 @@ import {
   NoteSchema,
   CategorySchema,
   DomainSchema,
+  CURRENT_SCHEMA_VERSION,
   type Note,
   type NoteMeta,
 } from "../src/lib/schema.ts";
@@ -77,6 +78,21 @@ async function main() {
       continue;
     }
     const note = parsed.data;
+
+    // Schema-version gate: a note older than the current model must be migrated
+    // before it can build; a note newer than this build means stale output.
+    if (note.schemaVersion < CURRENT_SCHEMA_VERSION) {
+      errors.push(
+        `${id}: schemaVersion ${note.schemaVersion} is behind current ${CURRENT_SCHEMA_VERSION} — run \`npm run migrate\``,
+      );
+      continue;
+    }
+    if (note.schemaVersion > CURRENT_SCHEMA_VERSION) {
+      errors.push(
+        `${id}: schemaVersion ${note.schemaVersion} is ahead of current ${CURRENT_SCHEMA_VERSION} — this build is stale; pull/rebuild`,
+      );
+      continue;
+    }
 
     if (note.id !== id) {
       errors.push(`${id}: note id "${note.id}" does not match folder name "${id}"`);

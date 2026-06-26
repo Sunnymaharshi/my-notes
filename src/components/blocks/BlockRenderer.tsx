@@ -7,6 +7,7 @@ import { TextBlock } from "./TextBlock.tsx";
 import { TableBlock } from "./TableBlock.tsx";
 import { Flashcard } from "./Flashcard.tsx";
 import { ImageBlock } from "./ImageBlock.tsx";
+import { LinkBlock } from "./LinkBlock.tsx";
 
 function render(node: BlockNode, path: string) {
   switch (node.type) {
@@ -24,6 +25,17 @@ function render(node: BlockNode, path: string) {
       return <Flashcard node={node} />;
     case "image":
       return <ImageBlock node={node} />;
+    case "link":
+      return <LinkBlock node={node} />;
+    default:
+      // An unknown type means this build predates a node type used by the note
+      // (e.g. opened with stale build output). Degrade to a visible placeholder
+      // instead of crashing the whole note — never throw on unknown content.
+      return (
+        <p style={{ opacity: 0.6, fontStyle: "italic" }}>
+          [unsupported block: {(node as { type?: string }).type ?? "unknown"}]
+        </p>
+      );
   }
 }
 

@@ -37,10 +37,17 @@ export interface CodeNode {
   type: "code";
   lang: string;
   code: string;
-  filename?: string;
   highlight?: number[];
   /** Pre-rendered highlighted HTML, injected server-side at build/dev. Not in source. */
   codeHtml?: string;
+}
+
+// A labelled hyperlink — e.g. a source-code reference backing the surrounding note.
+// `text` is the visible label; defaults to the URL when omitted by the renderer.
+export interface LinkNode {
+  type: "link";
+  url: string;
+  text?: string;
 }
 
 export interface ImageNode {
@@ -82,15 +89,21 @@ export type BlockNode =
   | CalloutNode
   | TextNode
   | TableNode
-  | FlashcardNode;
+  | FlashcardNode
+  | LinkNode;
 
 // Defined as plain ZodObjects so they can be used as discriminatedUnion options.
 export const CodeNodeSchema = z.object({
   type: z.literal("code"),
   lang: z.string().min(1),
   code: z.string(),
-  filename: z.string().optional(),
   highlight: z.array(z.number().int().nonnegative()).optional(),
+});
+
+export const LinkNodeSchema = z.object({
+  type: z.literal("link"),
+  url: z.string().min(1),
+  text: z.string().optional(),
 });
 
 export const ImageNodeSchema = z.object({
@@ -139,6 +152,7 @@ export const BlockNodeSchema: z.ZodType<BlockNode> = z.lazy(() =>
     TextNodeSchema,
     TableNodeSchema,
     FlashcardNodeSchema,
+    LinkNodeSchema,
   ]),
 ) as z.ZodType<BlockNode>;
 
@@ -147,7 +161,18 @@ export const BlockNodeSchema: z.ZodType<BlockNode> = z.lazy(() =>
 export const Difficulty = z.enum(["beginner", "intermediate", "advanced"]);
 export type Difficulty = z.infer<typeof Difficulty>;
 
+/**
+ * Current content schema version. Bump this only for a BREAKING change to the
+ * model (a node type/field changes shape or is removed — additive changes don't
+ * count). Every bump pairs with a migration in scripts/migrate-content.ts that
+ * rewrites notes-on-disk from the previous version, and the build gate refuses
+ * any note whose `schemaVersion` is below this until it has been migrated.
+ * Notes written before versioning have no field; they read as version 1.
+ */
+export const CURRENT_SCHEMA_VERSION = 1;
+
 export const NoteSchema = z.object({
+  schemaVersion: z.number().int().positive().default(1),
   id: z
     .string()
     .min(1)

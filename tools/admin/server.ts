@@ -29,6 +29,7 @@ import {
   NoteSchema,
   CategorySchema,
   DomainSchema,
+  CURRENT_SCHEMA_VERSION,
   type Note,
   type NoteMeta,
 } from "../../src/lib/schema.ts";
@@ -218,6 +219,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<boolea
       // ok, doesn't exist
     }
     const note: Note = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
       id,
       title,
       category,

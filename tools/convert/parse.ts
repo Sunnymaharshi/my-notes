@@ -23,6 +23,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { BlockNode, Note, OutlineNode } from "../../src/lib/schema.ts";
+import { CURRENT_SCHEMA_VERSION } from "../../src/lib/schema.ts";
 
 const TAB = "    ";
 export const EXT_LANG: Record<string, string> = {
@@ -167,6 +168,7 @@ async function main() {
 
   const id = arg("id") ?? slugify(base);
   const note: Note = {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     id,
     title,
     category: arg("category") ?? "uncategorized",

@@ -7,6 +7,7 @@
     "content": "tsx scripts/build-content.ts",
     "convert": "tsx tools/convert/parse.ts",
     "dupes": "tsx scripts/dupes.ts",
+    "migrate": "tsx scripts/migrate-content.ts",
     "admin": "vite --config vite.admin.config.ts",
     "dev": "vite",
     "prebuild": "npm run content",

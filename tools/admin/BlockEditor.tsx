@@ -12,6 +12,7 @@ import type {
   CodeNode,
   FlashcardNode,
   ImageNode,
+  LinkNode,
   OutlineNode,
   TableNode,
   TextNode,
@@ -30,7 +31,7 @@ import {
 } from "./tree-ops.ts";
 
 const VARIANTS: CalloutVariant[] = ["tip", "warning", "info", "note", "gotcha"];
-const TYPES: BlockNode["type"][] = ["outline", "text", "code", "callout", "table", "flashcard", "image"];
+const TYPES: BlockNode["type"][] = ["outline", "text", "code", "callout", "table", "flashcard", "image", "link"];
 
 function newNode(type: BlockNode["type"]): BlockNode {
   switch (type) {
@@ -48,6 +49,8 @@ function newNode(type: BlockNode["type"]): BlockNode {
       return { type: "flashcard", q: "", a: "" };
     case "image":
       return { type: "image", src: "", alt: "" };
+    case "link":
+      return { type: "link", url: "" };
   }
 }
 
@@ -163,6 +166,8 @@ function NodeFields({
       return <FlashcardFields node={node} update={update} />;
     case "image":
       return <ImageFields node={node} update={update} noteId={noteId} />;
+    case "link":
+      return <LinkFields node={node} update={update} />;
   }
 }
 
@@ -210,11 +215,6 @@ function CodeFields({ node, update }: { node: CodeNode; update: (n: BlockNode) =
           placeholder="lang"
           value={node.lang}
           onChange={(e) => update({ ...node, lang: e.target.value })}
-        />
-        <input
-          placeholder="filename (optional)"
-          value={node.filename ?? ""}
-          onChange={(e) => update({ ...node, filename: e.target.value || undefined })}
         />
         <input
           placeholder="highlight lines (e.g. 2,5)"
@@ -386,6 +386,23 @@ function ImageFields({
         placeholder="caption (optional)"
         value={node.caption ?? ""}
         onChange={(e) => update({ ...node, caption: e.target.value || undefined })}
+      />
+    </div>
+  );
+}
+
+function LinkFields({ node, update }: { node: LinkNode; update: (n: BlockNode) => void }) {
+  return (
+    <div className="fields">
+      <input
+        placeholder="url (e.g. https://github.com/…)"
+        value={node.url}
+        onChange={(e) => update({ ...node, url: e.target.value })}
+      />
+      <input
+        placeholder="label (optional; defaults to the url)"
+        value={node.text ?? ""}
+        onChange={(e) => update({ ...node, text: e.target.value || undefined })}
       />
     </div>
   );

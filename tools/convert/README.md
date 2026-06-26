@@ -50,7 +50,7 @@ If converting by hand or via AI without the parser, follow these same mappings:
    and depth exactly** — do not flatten or reorder.
 3. **Short clarifier on a leaf** → put it in the optional `note` field instead of adding a
    child (e.g. `{ "type": "outline", "text": "Field", "note": "min_length=2" }`).
-4. **Code** → a `code` node `{ lang, code, filename? }` placed as a child under the topic it
+4. **Code** → a `code` node `{ lang, code }` placed as a child under the topic it
    belongs to. Keep the code verbatim. In JSON, newlines = `\n`, double quotes = `\"`.
 5. **Comparison / pros-cons / X-vs-Y** → a `table` node `{ headers, rows }`.
 6. **Tip / warning / gotcha aside** → a `callout` node `{ variant, text }`
@@ -58,6 +58,8 @@ If converting by hand or via AI without the parser, follow these same mappings:
 7. **Q&A or "test me" pair** → a `flashcard` node `{ q, a }`.
 8. **Image** → an `image` node `{ src, alt }`; put the file in the note folder, `src` is
    relative (`"./diagram.png"`).
+8b. **Source/reference URL** → a `link` node `{ url, text? }` (e.g. a GitHub link backing the
+   note); keep the core logic itself in a `code` node.
 9. **Validate:** run `npm run content`. Fix the path-level errors it reports until it prints
    `✔ N note(s) validated`.
 
@@ -75,9 +77,10 @@ If converting by hand or via AI without the parser, follow these same mappings:
 ```
 envelope  { id, title, category, labels[], summary, difficulty?, related?[], updated, draft, body[] }
 outline   { type:"outline", text, note?, children?[] }
-code      { type:"code", lang, code, filename?, highlight?[] }
+code      { type:"code", lang, code, highlight?[] }
 image     { type:"image", src, alt, caption? }
 callout   { type:"callout", variant:"tip|warning|info|note|gotcha", text }
 table     { type:"table", headers[], rows[][] }
 flashcard { type:"flashcard", q, a }
+link      { type:"link", url, text? }
 ```

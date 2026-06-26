@@ -68,6 +68,8 @@ function nodeText(node: BlockNode): string {
       return node.caption ? `${node.alt} ${node.caption}` : node.alt;
     case "code":
       return node.code;
+    case "link":
+      return node.text ? `${node.text} ${node.url}` : node.url;
   }
 }
 

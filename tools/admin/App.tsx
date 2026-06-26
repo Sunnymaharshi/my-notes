@@ -6,6 +6,7 @@
  */
 import { Component, useEffect, useMemo, useState } from "react";
 import type { BlockNode, Category, Domain, Note, NoteMeta } from "../../src/lib/schema.ts";
+import { CURRENT_SCHEMA_VERSION } from "../../src/lib/schema.ts";
 import { dupeFlagsForNote, type DupeGroup } from "../../src/lib/dupes.ts";
 import { api, ApiError } from "./api.ts";
 import { EnvelopeForm } from "./EnvelopeForm.tsx";
@@ -33,6 +34,7 @@ class PreviewErrorBoundary extends Component<
 }
 
 const makeBlank = (cats: Category[]): Note => ({
+  schemaVersion: CURRENT_SCHEMA_VERSION,
   id: "",
   title: "",
   category: cats[0]?.id ?? "",
@@ -94,7 +96,7 @@ export function App() {
     [notes],
   );
   const dupeFlags = useMemo(
-    () => (draft ? dupeFlagsForNote(draft.id, dupes) : new Map()),
+    () => (draft ? dupeFlagsForNote(draft.id, dupes) : new Map<string, DupeGroup>()),
     [draft, dupes],
   );
 
@@ -255,8 +257,10 @@ export function App() {
         )}
       </aside>
 
-      {/* Main content: paste panes (top) + envelope form (bottom) */}
+      {/* Main content: paste panes (top) + envelope form (bottom).
+          Guarded so a render crash in either pane shows a message, not a blank screen. */}
       <main className="workarea">
+       <PreviewErrorBoundary>
         {/* Top: always-visible paste notes area */}
         <section className="pasteSection">
           <ImportDialog
@@ -274,6 +278,22 @@ export function App() {
               <div className="toolbar">
                 <strong>{draft.title || (selectedId ? draft.id : "New note")}</strong>
                 {dirty && <span className="dirty">unsaved</span>}
+                {dupeFlags.size > 0 && (
+                  <span
+                    className="dupeFlag"
+                    title={[...dupeFlags.values()]
+                      .map(
+                        (g) =>
+                          `${g.kind}: also in ${g.occurrences
+                            .filter((o) => o.noteId !== draft.id)
+                            .map((o) => o.noteId)
+                            .join(", ")}`,
+                      )
+                      .join("\n")}
+                  >
+                    ⚠ {dupeFlags.size} duplicated block{dupeFlags.size > 1 ? "s" : ""}
+                  </span>
+                )}
                 <span className="spacer" />
                 {selectedId && <button onClick={cloneNote}>Clone</button>}
                 {selectedId && <button className="danger" onClick={remove}>Delete</button>}
@@ -299,6 +319,7 @@ export function App() {
             <p style={{ padding: "1rem", opacity: 0.5 }}>Loading...</p>
           )}
         </section>
+       </PreviewErrorBoundary>
       </main>
 
       {catalogOpen && (

@@ -84,6 +84,7 @@
 
 /* --- code --- */
 .code {
+  position: relative;
   margin: var(--sp-3) 0;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -92,35 +93,41 @@
   box-shadow: var(--shadow-1);
 }
 
-.codeBar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 7px var(--sp-3);
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-elev);
+/* Large code is capped to a scrollable viewport; .codeExpanded lifts the cap. */
+.code .shiki,
+.code .codePlain {
+  max-height: 24rem;
+  overflow: auto;
 }
 
-.codeLang {
-  font-family: var(--font-mono);
-  font-size: var(--step--1);
-  letter-spacing: 0.04em;
-  color: var(--text-dim);
+.codeExpanded .shiki,
+.codeExpanded .codePlain {
+  max-height: none;
 }
 
-.copyBtn {
+/* Expand/collapse toggle, floated in the corner (replaces the old title/copy bar). */
+.codeExpandBtn {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-dim);
-  background: none;
+  background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   padding: 2px var(--sp-2);
   cursor: pointer;
-  transition: color var(--dur-1), border-color var(--dur-1);
+  opacity: 0;
+  transition: opacity var(--dur-1), color var(--dur-1), border-color var(--dur-1);
 }
 
-.copyBtn:hover {
+.code:hover .codeExpandBtn,
+.codeExpandBtn:focus-visible {
+  opacity: 1;
+}
+
+.codeExpandBtn:hover {
   color: var(--hl);
   border-color: var(--border-strong);
 }
@@ -303,4 +310,35 @@
   color: var(--text-dim);
   font-size: 13px;
   margin-top: var(--sp-2);
+}
+
+/* --- link (e.g. source-code reference) --- */
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: var(--sp-3) 0;
+  padding: 6px var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-elev);
+  color: var(--text-mid);
+  text-decoration: none;
+  font-size: 14px;
+  transition: border-color var(--dur-1), color var(--dur-1);
+}
+
+.link:hover {
+  border-color: var(--hl-line);
+  color: var(--hl);
+}
+
+.linkIcon {
+  font-family: var(--font-mono);
+  color: var(--hl);
+  flex-shrink: 0;
+}
+
+.linkText {
+  overflow-wrap: anywhere;
 }

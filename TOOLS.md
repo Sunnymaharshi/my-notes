@@ -10,6 +10,7 @@ as one `index.json` per note (schema: `src/lib/schema.ts`).
 | `npm run convert -- <file> [flags]` | Parse a notes file → skeleton note JSON (see below). |
 | `npm run admin` | Local-only studio (port 5174): visual block editor + import + live preview. |
 | `npm run dupes [-- --json]` | Report duplicate outline text / code within and across notes (§7a). |
+| `npm run migrate [-- --check]` | Upgrade notes-on-disk to the current schema version (`--check` = dry run). |
 | `npm run content` | Validate all notes against the schema, emit `public/content/` (drafts excluded). |
 | `npm run validate` | Validate only (no output written). |
 | `npm run dev` | Dev server; serves notes **live from `content/`** (edit-refresh, drafts shown). |
@@ -41,6 +42,25 @@ Flags: `--write` (save to `content/notes/<id>/`; omit to preview on stdout), `--
 `--title`, `--category`, `--append <id>`, `--section "Title"`.
 
 Full procedure (incl. the enrichment stage): `tools/convert/README.md`.
+
+## Schema versioning & migrations
+
+The content model evolves without breaking notes already on disk. The note envelope carries a
+`schemaVersion`; `CURRENT_SCHEMA_VERSION` lives in `src/lib/schema.ts`. Two kinds of change:
+
+- **Additive (the common case): a new node `type`, a new optional field, a new enum member.**
+  No version bump, no migration. Add the schema entry + renderer + editor control and ship. The
+  `BlockRenderer` default case renders an `[unsupported block: …]` placeholder, so even a note
+  using a type an older build doesn't know about degrades gracefully instead of crashing.
+- **Breaking: an existing type/field changes shape or is removed.** Bump
+  `CURRENT_SCHEMA_VERSION`, add a migration in `scripts/migrate-content.ts` keyed by the version
+  it upgrades *from* (each takes a vN note → vN+1, bumping `schemaVersion`), then run
+  `npm run migrate` to rewrite every note and `git` the result. Prefer widening over flipping a
+  field's type in one step (accept old + new shape, migrate, then drop the old arm).
+
+The build gate (`npm run content` / `build`) **fails** if any note's `schemaVersion` is behind
+current (→ run `npm run migrate`) or ahead of it (→ the build is stale; pull/rebuild), so disk
+and code can never silently drift. Notes written before versioning have no field and read as v1.
 
 ## Migration (existing notes → site)
 
