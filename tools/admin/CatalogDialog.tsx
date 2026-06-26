@@ -44,6 +44,17 @@ export function CatalogDialog({
   const delDom = (i: number) => setDoms((ds) => ds.filter((_, j) => j !== i));
   const delCat = (i: number) => setCats((cs) => cs.filter((_, j) => j !== i));
 
+  // Reorder by swapping array neighbours; `order` is (re)assigned from position on save,
+  // so the list order you see is the order that ships.
+  const swap = <T,>(arr: T[], i: number, j: number): T[] => {
+    if (j < 0 || j >= arr.length) return arr;
+    const next = [...arr];
+    [next[i], next[j]] = [next[j], next[i]];
+    return next;
+  };
+  const moveDom = (i: number, dir: -1 | 1) => setDoms((ds) => swap(ds, i, i + dir));
+  const moveCat = (i: number, dir: -1 | 1) => setCats((cs) => swap(cs, i, i + dir));
+
   const save = async () => {
     setError(null);
     setBusy(true);
@@ -53,12 +64,12 @@ export function CatalogDialog({
       for (const c of cats) {
         if (c.__origId && c.__origId !== c.id) renames[c.__origId] = c.id;
       }
-      // Drop empty color strings and the __origId tag; coerce order to a number.
-      const cleanDoms = doms.map((d) => ({ ...d, color: d.color || undefined, order: Number(d.order) || 0 }));
-      const cleanCats = cats.map(({ __origId, ...c }) => ({
+      // Drop empty color strings and the __origId tag; `order` follows list position.
+      const cleanDoms = doms.map((d, i) => ({ ...d, color: d.color || undefined, order: i + 1 }));
+      const cleanCats = cats.map(({ __origId, ...c }, i) => ({
         ...c,
         color: c.color || undefined,
-        order: Number(c.order) || 0,
+        order: i + 1,
       }));
       const savedDoms = await api.saveDomains(cleanDoms);
       const savedCats = await api.saveCategories(cleanCats, renames);
@@ -94,7 +105,8 @@ export function CatalogDialog({
                   <input className="cId" placeholder="id" value={d.id} onChange={(e) => patchDom(i, { id: e.target.value })} />
                   <input placeholder="label" value={d.label} onChange={(e) => patchDom(i, { label: e.target.value })} />
                   <input className="cColor" placeholder="#color" value={d.color ?? ""} onChange={(e) => patchDom(i, { color: e.target.value })} />
-                  <input className="cOrder" type="number" value={d.order} onChange={(e) => patchDom(i, { order: Number(e.target.value) })} />
+                  <button className="tiny" title="Move up" disabled={i === 0} onClick={() => moveDom(i, -1)}>↑</button>
+                  <button className="tiny" title="Move down" disabled={i === doms.length - 1} onClick={() => moveDom(i, 1)}>↓</button>
                   <button className="tiny danger" title="Delete" onClick={() => delDom(i)}>✕</button>
                 </div>
               ))}
@@ -121,7 +133,8 @@ export function CatalogDialog({
                     ))}
                   </select>
                   <input className="cColor" placeholder="#color" value={c.color ?? ""} onChange={(e) => patchCat(i, { color: e.target.value })} />
-                  <input className="cOrder" type="number" value={c.order} onChange={(e) => patchCat(i, { order: Number(e.target.value) })} />
+                  <button className="tiny" title="Move up" disabled={i === 0} onClick={() => moveCat(i, -1)}>↑</button>
+                  <button className="tiny" title="Move down" disabled={i === cats.length - 1} onClick={() => moveCat(i, 1)}>↓</button>
                   <button className="tiny danger" title="Delete" onClick={() => delCat(i)}>✕</button>
                 </div>
               ))}
@@ -131,8 +144,9 @@ export function CatalogDialog({
 
         {error && <div className="paneError">{error}</div>}
         <p className="hint">
-          Renaming a category's id updates every note that uses it. Deleting a category that
-          notes still use is blocked — reassign or rename those notes first.
+          Use ↑/↓ to reorder — the list order is the order shown in the sidebar (saved as
+          <code> order</code>). Renaming a category's id updates every note that uses it. Deleting
+          a category that notes still use is blocked — reassign or rename those notes first.
         </p>
 
         <div className="modalActions">

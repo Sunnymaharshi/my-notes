@@ -40,7 +40,16 @@ export const api = {
   remove: (id: string) => req<{ ok: true }>(`/api/notes/${id}`, jsonInit("DELETE", {})),
   upload: (id: string, filename: string, dataBase64: string) =>
     req<{ src: string }>(`/api/notes/${id}/assets`, jsonInit("POST", { filename, dataBase64 })),
+  assets: (id: string) => req<{ assets: string[] }>(`/api/notes/${id}/assets`),
+  deleteAsset: (id: string, filename: string) =>
+    req<{ ok: true; assets: string[] }>(
+      `/api/notes/${id}/assets/${encodeURIComponent(filename)}`,
+      jsonInit("DELETE", {}),
+    ),
   import: (text: string, ext: string) =>
     req<{ body: BlockNode[] }>("/api/import", jsonInit("POST", { text, ext })),
+  highlight: (body: BlockNode[]) =>
+    req<{ body: BlockNode[] }>("/api/highlight", jsonInit("POST", { body })),
   dupes: () => req<DupeGroup[]>("/api/dupes"),
+  validate: () => req<{ ok: boolean; output: string }>("/api/validate", { method: "POST" }),
 };

@@ -4,7 +4,7 @@
  * outline nodes nest their children recursively. A ⚠ shows when a node's text/code is
  * duplicated elsewhere (§7a), linking to the other locations.
  */
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import type {
   BlockNode,
   CalloutNode,
@@ -24,11 +24,17 @@ import {
   appendTop,
   indent,
   insertAfter,
+  insertBefore,
   move,
+  moveNode,
   outdent,
   removeAt,
   replaceAt,
 } from "./tree-ops.ts";
+
+/** DnD drop region relative to a node, derived from the pointer's position over its bar. */
+type DropPos = "before" | "after" | "child";
+const DND_MIME = "application/x-block-path";
 
 const VARIANTS: CalloutVariant[] = ["tip", "warning", "info", "note", "gotcha"];
 const TYPES: BlockNode["type"][] = ["outline", "text", "code", "callout", "table", "flashcard", "image", "link"];
@@ -61,11 +67,13 @@ export function BlockEditor({
   onChange,
   dupeFlags,
   noteId,
+  onAssetChange,
 }: {
   body: BlockNode[];
   onChange: (body: BlockNode[]) => void;
   dupeFlags: Map<string, DupeGroup>;
   noteId: string;
+  onAssetChange?: () => void;
 }) {
   const apply: Apply = (fn) => onChange(fn(body));
   return (
@@ -79,6 +87,7 @@ export function BlockEditor({
           apply={apply}
           dupeFlags={dupeFlags}
           noteId={noteId}
+          onAssetChange={onAssetChange}
         />
       ))}
       <AddBar onAdd={(t) => onChange(appendTop(body, newNode(t)))} label="Add block" />
@@ -92,20 +101,83 @@ function NodeEditor({
   apply,
   dupeFlags,
   noteId,
+  onAssetChange,
 }: {
   node: BlockNode;
   path: string;
   apply: Apply;
   dupeFlags: Map<string, DupeGroup>;
   noteId: string;
+  onAssetChange?: () => void;
 }) {
   const update = (next: BlockNode) => apply((b) => replaceAt(b, path, next));
   const dupe = dupeFlags.get(path);
 
+  const isTopic = node.type === "outline" && node.role === "topic";
+
+  // Drag-and-drop reorder. The bar is the drag handle and the drop target; the pointer's
+  // vertical position over it picks before / after (and, for outlines, child = nest inside).
+  const [dropPos, setDropPos] = useState<DropPos | null>(null);
+  const regionFor = (e: React.DragEvent): DropPos => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = (e.clientY - rect.top) / rect.height;
+    if (node.type === "outline") return y < 0.34 ? "before" : y > 0.66 ? "after" : "child";
+    return y < 0.5 ? "before" : "after";
+  };
+  const onDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData(DND_MIME, path);
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const onDragOver = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes(DND_MIME)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+    setDropPos(regionFor(e));
+  };
+  const onDrop = (e: React.DragEvent) => {
+    const from = e.dataTransfer.getData(DND_MIME);
+    if (!from) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const where = regionFor(e);
+    setDropPos(null);
+    apply((b) => moveNode(b, from, path, where));
+  };
+
   return (
-    <div className={`node node-${node.type}`}>
-      <div className="nodeBar">
+    <div className={`node node-${node.type}${isTopic ? " is-topic" : ""}${dropPos ? ` drop-${dropPos}` : ""}`}>
+      <div
+        className="nodeBar"
+        onDragOver={onDragOver}
+        onDragLeave={() => setDropPos(null)}
+        onDrop={onDrop}
+      >
+        <span
+          className="dragHandle"
+          draggable
+          onDragStart={onDragStart}
+          title="Drag to move this block"
+          aria-label="Drag to move"
+        >
+          ⠿
+        </span>
         <span className="nodeType">{node.type}</span>
+        {node.type === "outline" && (
+          <button
+            className={`topicBtn${isTopic ? " on" : ""}`}
+            title={
+              isTopic
+                ? "Topic — click to unmark"
+                : "Mark as topic (a standalone, search-deep-linkable unit)"
+            }
+            onClick={() =>
+              update({ ...node, role: isTopic ? undefined : "topic" })
+            }
+          >
+            ◆ topic
+          </button>
+        )}
         {dupe && (
           <span className="dupe" title={dupe.occurrences.map((o) => `${o.noteId}#n${o.path}`).join("\n")}>
             ⚠ duplicate ×{dupe.occurrences.length}
@@ -119,7 +191,9 @@ function NodeEditor({
         <button className="danger" title="Delete" onClick={() => apply((b) => removeAt(b, path))}>✕</button>
       </div>
 
-      <NodeFields node={node} update={update} noteId={noteId} />
+      <AddBar onAdd={(t) => apply((b) => insertBefore(b, path, newNode(t)))} label="Add before" subtle />
+
+      <NodeFields node={node} update={update} noteId={noteId} onAssetChange={onAssetChange} />
 
       {node.type === "outline" && (
         <div className="children">
@@ -131,6 +205,7 @@ function NodeEditor({
               apply={apply}
               dupeFlags={dupeFlags}
               noteId={noteId}
+              onAssetChange={onAssetChange}
             />
           ))}
           <AddBar onAdd={(t) => apply((b) => appendChild(b, path, newNode(t)))} label="Add child" />
@@ -146,10 +221,12 @@ function NodeFields({
   node,
   update,
   noteId,
+  onAssetChange,
 }: {
   node: BlockNode;
   update: (n: BlockNode) => void;
   noteId: string;
+  onAssetChange?: () => void;
 }) {
   switch (node.type) {
     case "outline":
@@ -165,7 +242,7 @@ function NodeFields({
     case "flashcard":
       return <FlashcardFields node={node} update={update} />;
     case "image":
-      return <ImageFields node={node} update={update} noteId={noteId} />;
+      return <ImageFields node={node} update={update} noteId={noteId} onAssetChange={onAssetChange} />;
     case "link":
       return <LinkFields node={node} update={update} />;
   }
@@ -187,14 +264,6 @@ function OutlineFields({ node, update }: { node: OutlineNode; update: (n: BlockN
         value={node.note ?? ""}
         onChange={(e) => update({ ...node, note: e.target.value || undefined })}
       />
-      <label className="topicToggle" title="Mark as a standalone topic — search results land on the nearest topic">
-        <input
-          type="checkbox"
-          checked={node.role === "topic"}
-          onChange={(e) => update({ ...node, role: e.target.checked ? "topic" : undefined })}
-        />
-        <span>Topic (standalone unit)</span>
-      </label>
     </div>
   );
 }
@@ -347,10 +416,12 @@ function ImageFields({
   node,
   update,
   noteId,
+  onAssetChange,
 }: {
   node: ImageNode;
   update: (n: BlockNode) => void;
   noteId: string;
+  onAssetChange?: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -358,6 +429,7 @@ function ImageFields({
     const dataBase64 = await fileToBase64(file);
     const { src } = await api.upload(noteId, file.name, dataBase64);
     update({ ...node, src });
+    onAssetChange?.();
   };
 
   return (

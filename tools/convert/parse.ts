@@ -71,15 +71,15 @@ interface Frame {
   node: { children?: BlockNode[] };
 }
 
-/** Seed `role: "topic"` on the top outline branches (depth 0–1 nodes that have children).
- *  A faithful first guess at the self-contained, search-deep-linkable units; refine by hand
- *  after converting (see tools/convert/README.md). Leaf lines stay unmarked details. */
+/** Seed `role: "topic"` on the top-level outline branches only (depth-0 nodes that have
+ *  children). A faithful first guess at the self-contained, search-deep-linkable units;
+ *  promote deeper nodes to topics by hand in the admin (see tools/convert/README.md).
+ *  Everything below the top level stays an unmarked detail line until opted in. */
 function seedRoles(nodes: BlockNode[], depth = 0): void {
-  if (depth > 1) return;
+  if (depth > 0) return;
   for (const node of nodes) {
     if (node.type !== "outline" || !node.children?.length) continue;
     node.role = "topic";
-    seedRoles(node.children, depth + 1);
   }
 }
 

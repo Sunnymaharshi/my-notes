@@ -17,12 +17,17 @@
  *   POST   /api/notes                 -> create skeleton {id,title,category} (draft)
  *   PUT    /api/notes/:id             -> validate + write (supports id rename)
  *   DELETE /api/notes/:id             -> remove the note folder
+ *   GET    /api/notes/:id/assets      -> {assets:[filename,…]} colocated files
  *   POST   /api/notes/:id/assets      -> {filename, dataBase64} -> save image into the folder
+ *   DELETE /api/notes/:id/assets/:file -> delete a colocated asset
+ *   (PUT rename + DELETE cascade into other notes' related[] so cross-links never dangle)
  *   POST   /api/import                -> {text, ext?} -> deterministic parser -> skeleton body
  *   GET    /api/dupes                 -> duplicate groups across all notes (§7a)
+ *   POST   /api/validate              -> run `npm run validate` (strict build, check-only) -> {ok,output}
  */
 import type { Plugin } from "vite";
 import { promises as fs } from "node:fs";
+import { spawn } from "node:child_process";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import {
@@ -35,6 +40,7 @@ import {
 } from "../../src/lib/schema.ts";
 import { findDuplicates } from "../../src/lib/dupes.ts";
 import { parse, EXT_LANG, slugify } from "../convert/parse.ts";
+import { highlightNote } from "../lib/highlight.ts";
 
 const root = process.cwd();
 const contentDir = path.join(root, "content");
@@ -105,6 +111,61 @@ async function allValidNotes(): Promise<Note[]> {
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
+
+/**
+ * Cascade a note id change (or deletion) into every OTHER note's `related[]`, so renames
+ * and deletes can't quietly leave dangling cross-links. `newId === null` removes the ref
+ * (deletion); otherwise it's rewritten. Returns the ids of notes that were touched.
+ */
+async function patchRelatedRefs(oldId: string, newId: string | null): Promise<string[]> {
+  const dirs = await fs.readdir(notesDir, { withFileTypes: true });
+  const touched: string[] = [];
+  for (const d of dirs) {
+    if (!d.isDirectory() || d.name === oldId) continue;
+    let raw: any;
+    try {
+      raw = await readNote(d.name);
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(raw.related) || !raw.related.includes(oldId)) continue;
+    const next = newId
+      ? raw.related.map((r: string) => (r === oldId ? newId : r))
+      : raw.related.filter((r: string) => r !== oldId);
+    raw.related = [...new Set(next)] as string[];
+    if (raw.related.length === 0) delete raw.related;
+    await fs.writeFile(path.join(notesDir, d.name, "index.json"), JSON.stringify(raw, null, 2) + "\n");
+    touched.push(d.name);
+  }
+  return touched;
+}
+
+/** List a note's colocated asset files (everything but index.json). */
+async function listAssets(id: string): Promise<string[]> {
+  try {
+    const entries = await fs.readdir(path.join(notesDir, id), { withFileTypes: true });
+    return entries.filter((e) => e.isFile() && e.name !== "index.json").map((e) => e.name).sort();
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Run the strict content build in check-only mode (`npm run validate` →
+ * scripts/build-content.ts --check). Writes nothing; returns the exact pass/fail and output
+ * the production build would produce, so the studio can confirm a save will deploy cleanly.
+ * Fixed command, no user input — nothing to inject.
+ */
+function runValidate(): Promise<{ ok: boolean; output: string }> {
+  return new Promise((resolve) => {
+    const child = spawn("npm", ["run", "validate"], { cwd: root });
+    let output = "";
+    child.stdout.on("data", (d) => (output += d));
+    child.stderr.on("data", (d) => (output += d));
+    child.on("error", (e) => resolve({ ok: false, output: String(e) }));
+    child.on("close", (code) => resolve({ ok: code === 0, output: output.trim() }));
+  });
+}
 
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
   const url = new URL(req.url ?? "", "http://localhost");
@@ -195,6 +256,22 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<boolea
     return true;
   }
 
+  // /api/validate  — run the strict content build (check-only); confirms a clean deploy.
+  if (p === "/api/validate" && method === "POST") {
+    json(res, await runValidate());
+    return true;
+  }
+
+  // /api/highlight  — decorate a body's code nodes with Shiki codeHtml (live preview parity).
+  if (p === "/api/highlight" && method === "POST") {
+    const { body = [] } = await readBody(req);
+    // highlightNote walks note.body; wrap the bare body in a throwaway envelope.
+    const note = { body } as unknown as Note;
+    await highlightNote(note);
+    json(res, { body: note.body });
+    return true;
+  }
+
   // /api/import
   if (p === "/api/import" && method === "POST") {
     const { text = "", ext = ".txt" } = await readBody(req);
@@ -234,6 +311,16 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<boolea
     return true;
   }
 
+  // /api/notes/:id/assets/:filename  (delete a colocated asset)
+  const am = p.match(/^\/api\/notes\/([a-z0-9-]+)\/assets\/(.+)$/);
+  if (am && method === "DELETE") {
+    const safe = path.basename(decodeURIComponent(am[2]));
+    if (safe === "index.json") return json(res, { error: "Refusing to delete index.json" }, 400), true;
+    await fs.rm(path.join(notesDir, am[1], safe), { force: true });
+    json(res, { ok: true, assets: await listAssets(am[1]) });
+    return true;
+  }
+
   // /api/notes/:id  (+ /assets)
   const m = p.match(/^\/api\/notes\/([a-z0-9-]+)(\/assets)?$/);
   if (m) {
@@ -247,6 +334,12 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<boolea
       await fs.mkdir(path.join(notesDir, id), { recursive: true });
       await fs.writeFile(path.join(notesDir, id, safe), Buffer.from(dataBase64, "base64"));
       json(res, { src: safe });
+      return true;
+    }
+
+    // List a note's colocated assets.
+    if (isAssets && method === "GET") {
+      json(res, { assets: await listAssets(id) });
       return true;
     }
 
@@ -286,6 +379,8 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<boolea
           // no old folder / assets
         }
         await fs.rm(path.join(notesDir, id), { recursive: true, force: true });
+        // Cascade the rename into other notes' related[] so cross-links don't dangle.
+        await patchRelatedRefs(id, note.id);
       }
       json(res, note);
       return true;
@@ -293,6 +388,8 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<boolea
 
     if (method === "DELETE") {
       await fs.rm(path.join(notesDir, id), { recursive: true, force: true });
+      // Strip the deleted id from any other note's related[].
+      await patchRelatedRefs(id, null);
       json(res, { ok: true });
       return true;
     }

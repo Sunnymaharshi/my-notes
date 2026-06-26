@@ -1,18 +1,23 @@
 /**
- * Admin studio shell. Layout: sidebar (note list) | main content area.
- * Main area: paste notes (top, always visible) + envelope form (bottom).
- * Saves validate against the same Zod schema as the build.
- * Local-only; never deployed.
+ * Admin studio shell. Layout:
+ *   sidebar (note list)  |  main: collapsible envelope bar  +  Source | Generated panes.
+ *
+ *   - Envelope bar (top): title + Save/Clone/Delete; expand to edit id/category/labels/related…
+ *   - Source pane (left): paste raw notes → parse → insert anywhere into the body.
+ *   - Generated pane (right): the live body — Preview | Edit | JSON tabs, all bound to draft.body.
+ *
+ * Saves validate against the same Zod schema as the build. Local-only; never deployed.
  */
-import { Component, useEffect, useMemo, useState } from "react";
+import { Component, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BlockNode, Category, Domain, Note, NoteMeta } from "../../src/lib/schema.ts";
 import { CURRENT_SCHEMA_VERSION } from "../../src/lib/schema.ts";
 import { dupeFlagsForNote, type DupeGroup } from "../../src/lib/dupes.ts";
 import { api, ApiError } from "./api.ts";
 import { EnvelopeForm } from "./EnvelopeForm.tsx";
-import { ImportDialog, type InsertTarget } from "./ImportDialog.tsx";
+import { SourcePane, type InsertTarget } from "./SourcePane.tsx";
+import { GeneratedPane } from "./GeneratedPane.tsx";
 import { CatalogDialog } from "./CatalogDialog.tsx";
-import { appendChild } from "./tree-ops.ts";
+import { flatten, insertNodes } from "./tree-ops.ts";
 
 class PreviewErrorBoundary extends Component<
   { children: React.ReactNode },
@@ -32,6 +37,31 @@ class PreviewErrorBoundary extends Component<
     return this.props.children;
   }
 }
+
+/** Disclosure chevron — points down when open, right when closed (CSS-rotated). */
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      className={`chevron ${open ? "open" : ""}`}
+      width="12"
+      height="12"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M6 4l4 4-4 4"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** MIME used when dragging a note in the sidebar to recategorize it. */
+const NOTE_MIME = "application/x-note-id";
 
 const makeBlank = (cats: Category[]): Note => ({
   schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -54,9 +84,69 @@ export function App() {
   const [draft, setDraft] = useState<Note | null>(null);
   const [original, setOriginal] = useState("");
   const [issues, setIssues] = useState<string[]>([]);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [status, setStatus] = useState("");
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [filter, setFilter] = useState("");
+  const [envOpen, setEnvOpen] = useState(true);
+
+  // Source | Generated split: leftPct is the Source pane width.
+  const [leftPct, setLeftPct] = useState(46);
+  const panesRef = useRef<HTMLDivElement>(null);
+  const dragging = useRef(false);
+
+  // Block-tree undo/redo: snapshots of `body` only. Rapid changes (typing) within 400ms
+  // coalesce into one step so undo jumps by edit, not by keystroke. forceHist re-renders
+  // so the toolbar button disabled-state stays accurate.
+  const undoRef = useRef<BlockNode[][]>([]);
+  const redoRef = useRef<BlockNode[][]>([]);
+  const lastPushRef = useRef(0);
+  const [, forceHist] = useState(0);
+  const resetHistory = () => {
+    undoRef.current = [];
+    redoRef.current = [];
+    lastPushRef.current = 0;
+    forceHist((n) => n + 1);
+  };
+
+  // Sidebar drag-to-recategorize: the category group currently hovered as a drop target.
+  const [dropCat, setDropCat] = useState<string | null>(null);
+
+  // Bumped whenever a note's colocated assets change (upload/delete), so the Assets panel
+  // re-fetches without manual refresh.
+  const [assetVer, setAssetVer] = useState(0);
+  const bumpAssets = useCallback(() => setAssetVer((v) => v + 1), []);
+
+  // Optional scroll sync between the Source textarea and the active Generated scroller,
+  // so raw notes and the rendered result can be compared side by side.
+  const [syncScroll, setSyncScroll] = useState(false);
+  const srcScrollRef = useRef<HTMLTextAreaElement>(null);
+  const genScrollRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!syncScroll) return;
+    let lock = false;
+    const onScroll = (e: Event) => {
+      if (lock) return;
+      const src = srcScrollRef.current;
+      const gen = genScrollRef.current;
+      if (!src || !gen) return;
+      const from = e.target as HTMLElement;
+      const to = from === src ? gen : from === gen ? src : null;
+      if (!to) return;
+      lock = true;
+      const max = from.scrollHeight - from.clientHeight;
+      const ratio = max > 0 ? from.scrollTop / max : 0;
+      to.scrollTop = ratio * (to.scrollHeight - to.clientHeight);
+      requestAnimationFrame(() => {
+        lock = false;
+      });
+    };
+    // Capture phase: scroll doesn't bubble, but capture sees inner elements — and reading
+    // the refs live means a Generated tab switch needs no re-binding.
+    document.addEventListener("scroll", onScroll, true);
+    return () => document.removeEventListener("scroll", onScroll, true);
+  }, [syncScroll]);
 
   const refreshLists = async () => {
     const [n, d] = await Promise.all([api.notes(), api.dupes()]);
@@ -74,11 +164,13 @@ export function App() {
   useEffect(() => {
     if (!selectedId) return;
     setIssues([]);
+    setWarnings([]);
     api
       .note(selectedId)
       .then((n) => {
         setDraft(n);
         setOriginal(JSON.stringify(n));
+        resetHistory();
       })
       .catch((e) => setStatus(String(e)));
   }, [selectedId]);
@@ -99,6 +191,7 @@ export function App() {
     () => (draft ? dupeFlagsForNote(draft.id, dupes) : new Map<string, DupeGroup>()),
     [draft, dupes],
   );
+  const targets = useMemo(() => (draft ? flatten(draft.body) : []), [draft]);
 
   // New (unsaved) notes are "dirty" as soon as they have a title or body; saved notes use JSON diff.
   const dirty =
@@ -108,6 +201,43 @@ export function App() {
       : JSON.stringify(draft) !== original);
 
   const patch = (p: Partial<Note>) => setDraft((d) => (d ? { ...d, ...p } : d));
+  const setBody = (body: BlockNode[]) =>
+    setDraft((d) => {
+      if (!d) return d;
+      const now = Date.now();
+      if (now - lastPushRef.current > 400) {
+        undoRef.current.push(d.body);
+        if (undoRef.current.length > 200) undoRef.current.shift();
+      }
+      lastPushRef.current = now;
+      redoRef.current = [];
+      forceHist((n) => n + 1);
+      return { ...d, body };
+    });
+
+  const undo = useCallback(() => {
+    if (undoRef.current.length === 0) return;
+    setDraft((d) => {
+      if (!d) return d;
+      const prev = undoRef.current.pop()!;
+      redoRef.current.push(d.body);
+      return { ...d, body: prev };
+    });
+    lastPushRef.current = 0;
+    forceHist((n) => n + 1);
+  }, []);
+
+  const redo = useCallback(() => {
+    if (redoRef.current.length === 0) return;
+    setDraft((d) => {
+      if (!d) return d;
+      const next = redoRef.current.pop()!;
+      undoRef.current.push(d.body);
+      return { ...d, body: next };
+    });
+    lastPushRef.current = 0;
+    forceHist((n) => n + 1);
+  }, []);
 
   const visibleNotes = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -116,15 +246,6 @@ export function App() {
       [n.title, n.category, ...n.labels].join(" ").toLowerCase().includes(q),
     );
   }, [notes, filter]);
-
-  const sections = useMemo(
-    () =>
-      (draft?.body ?? [])
-        .map((node, i) => ({ node, path: String(i) }))
-        .filter((s) => s.node.type === "outline")
-        .map((s) => ({ path: s.path, label: (s.node as { text: string }).text })),
-    [draft],
-  );
 
   const confirmDiscard = () =>
     !dirty || window.confirm("Discard unsaved changes to this note?");
@@ -140,6 +261,24 @@ export function App() {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [dirty]);
 
+  const onDividerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    dragging.current = true;
+    const onMove = (mv: MouseEvent) => {
+      if (!dragging.current || !panesRef.current) return;
+      const rect = panesRef.current.getBoundingClientRect();
+      const pct = Math.min(80, Math.max(20, ((mv.clientX - rect.left) / rect.width) * 100));
+      setLeftPct(pct);
+    };
+    const onUp = () => {
+      dragging.current = false;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, []);
+
   const selectNote = (id: string) => {
     if (id === selectedId || !confirmDiscard()) return;
     setSelectedId(id);
@@ -151,7 +290,10 @@ export function App() {
     setOriginal("");
     setSelectedId(null);
     setIssues([]);
+    setWarnings([]);
     setStatus("");
+    setEnvOpen(true);
+    resetHistory();
   };
 
   const cloneNote = async () => {
@@ -172,19 +314,30 @@ export function App() {
 
   const insertImported = (blocks: BlockNode[], target: InsertTarget) => {
     if (!draft) return;
-    if (target.mode === "replace") return patch({ body: blocks });
-    if (target.mode === "section") {
-      let body = draft.body;
-      for (const b of blocks) body = appendChild(body, target.path, b);
-      return patch({ body });
+    if (target.mode === "replace") return setBody(blocks);
+    if (target.mode === "append") return setBody([...draft.body, ...blocks]);
+    setBody(insertNodes(draft.body, target.path, target.mode, blocks));
+  };
+
+  // Non-blocking checks that an edit won't quietly break the site (dangling related ids, etc.).
+  const preflight = (note: Note): string[] => {
+    const w: string[] = [];
+    const ids = new Set(notes.map((n) => n.id));
+    ids.add(note.id);
+    const dangling = (note.related ?? []).filter((r) => !ids.has(r));
+    if (dangling.length) w.push(`Related points to unknown note(s): ${dangling.join(", ")}`);
+    // Renaming this note can orphan other notes' related[] that still point at the old id.
+    if (selectedId && note.id !== selectedId) {
+      w.push(`Renamed id ${selectedId} → ${note.id}: check other notes' "related" don't reference the old id.`);
     }
-    patch({ body: [...draft.body, ...blocks] });
+    return w;
   };
 
   const save = async () => {
     if (!draft) return;
     setIssues([]);
     setStatus("Saving...");
+    setWarnings(preflight(draft));
     try {
       let id = selectedId;
       if (!id) {
@@ -211,14 +364,117 @@ export function App() {
     }
   };
 
+  const validate = async () => {
+    setStatus("Validating…");
+    setIssues([]);
+    try {
+      const { ok, output } = await api.validate();
+      if (ok) {
+        setStatus("✓ Content build passes — safe to deploy");
+      } else {
+        setStatus("✖ Content build failed — see details");
+        setIssues(output.split("\n").filter((l) => l.trim()));
+      }
+    } catch (e) {
+      setStatus((e as Error).message);
+    }
+  };
+
   const remove = async () => {
     if (!selectedId || !window.confirm(`Delete note "${selectedId}"? This removes its folder.`)) return;
     await api.remove(selectedId);
     setSelectedId(null);
     setDraft(makeBlank(categories));
     setOriginal("");
+    resetHistory();
     await refreshLists();
   };
+
+  // Sidebar drag-to-recategorize: assign a note to the dropped-on category (persisted).
+  const recategorize = async (noteId: string, category: string) => {
+    const meta = notes.find((n) => n.id === noteId);
+    if (!meta || meta.category === category) return;
+    if (noteId === selectedId && dirty) {
+      setStatus("Save or discard the open note before moving it.");
+      return;
+    }
+    try {
+      const full = await api.note(noteId);
+      await api.save(noteId, { ...full, category });
+      await refreshLists();
+      if (noteId === selectedId) {
+        const reloaded = await api.note(noteId);
+        setDraft(reloaded);
+        setOriginal(JSON.stringify(reloaded));
+      }
+      setStatus(`Moved "${meta.title}" → ${category}`);
+    } catch (e) {
+      setStatus((e as Error).message);
+    }
+  };
+
+  // Keyboard: ⌘S save · ⌘Z undo · ⌘⇧Z / ⌘Y redo. In text inputs, defer undo/redo to the
+  // browser's native text history; save still works everywhere.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === "s") {
+        e.preventDefault();
+        if (dirty) save();
+        return;
+      }
+      const el = document.activeElement as HTMLElement | null;
+      const editable =
+        el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+      if (editable) return;
+      if (k === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if ((k === "z" && e.shiftKey) || k === "y") {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty, undo, redo, draft, selectedId]);
+
+  // Notes grouped by category for the sidebar (catalog order: domain, then category, then title).
+  const noteGroups = useMemo(() => {
+    const byCat = new Map<string, NoteMeta[]>();
+    for (const n of visibleNotes) {
+      const list = byCat.get(n.category) ?? byCat.set(n.category, []).get(n.category)!;
+      list.push(n);
+    }
+    const catById = new Map(categories.map((c) => [c.id, c]));
+    const domOrder = new Map(domains.map((d) => [d.id, d.order]));
+    const order = (cat: string) => {
+      const c = catById.get(cat);
+      return [c ? domOrder.get(c.domain) ?? 999 : 999, c?.order ?? 999];
+    };
+    return [...byCat.keys()]
+      .sort((a, b) => {
+        const [da, oa] = order(a);
+        const [db, ob] = order(b);
+        return da - db || oa - ob || a.localeCompare(b);
+      })
+      .map((cat) => ({ cat, label: catById.get(cat)?.label ?? cat, notes: byCat.get(cat)! }));
+  }, [visibleNotes, categories, domains]);
+
+  const dupeTitle =
+    dupeFlags.size > 0
+      ? [...dupeFlags.values()]
+          .map(
+            (g) =>
+              `${g.kind}: also in ${g.occurrences
+                .filter((o) => o.noteId !== draft?.id)
+                .map((o) => o.noteId)
+                .join(", ")}`,
+          )
+          .join("\n")
+      : "";
 
   return (
     <div className="app">
@@ -228,98 +484,163 @@ export function App() {
           Notes Admin <span className="local">local-only</span>
         </div>
         <button className="primary block" onClick={newNote}>+ New note</button>
-        <button className="block" onClick={() => setCatalogOpen(true)}>Manage catalog...</button>
+        <button className="block" onClick={() => setCatalogOpen(true)}>Manage catalog…</button>
         <input
           className="filterBox"
-          placeholder="Filter notes..."
+          placeholder="Filter notes…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
-        <ul className="noteList">
-          {visibleNotes.map((n) => (
-            <li key={n.id}>
-              <button
-                className={n.id === selectedId ? "noteItem active" : "noteItem"}
-                onClick={() => selectNote(n.id)}
+        <div className="noteList">
+          {noteGroups.map((g) => (
+            <div className="noteGroup" key={g.cat}>
+              <div
+                className={`noteGroupHead${dropCat === g.cat ? " dropTarget" : ""}`}
+                title="Drop a note here to move it to this category"
+                onDragOver={(e) => {
+                  if (!e.dataTransfer.types.includes(NOTE_MIME)) return;
+                  e.preventDefault();
+                  setDropCat(g.cat);
+                }}
+                onDragLeave={() => setDropCat((c) => (c === g.cat ? null : c))}
+                onDrop={(e) => {
+                  const id = e.dataTransfer.getData(NOTE_MIME);
+                  setDropCat(null);
+                  if (id) recategorize(id, g.cat);
+                }}
               >
-                <span className="noteTitle">{n.title}</span>
-                <span className="noteMeta">
-                  {n.category}
-                  {n.draft && <span className="draftTag">draft</span>}
-                </span>
-              </button>
-            </li>
+                {g.label}
+              </div>
+              <ul>
+                {g.notes.map((n) => (
+                  <li key={n.id}>
+                    <button
+                      className={n.id === selectedId ? "noteItem active" : "noteItem"}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData(NOTE_MIME, n.id);
+                        e.dataTransfer.effectAllowed = "move";
+                      }}
+                      onClick={() => selectNote(n.id)}
+                    >
+                      <span className="noteTitle">{n.title}</span>
+                      {n.draft && <span className="noteMeta"><span className="draftTag">draft</span></span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-          {visibleNotes.length === 0 && <li className="noteMeta">No notes match "{filter}".</li>}
-        </ul>
+          {visibleNotes.length === 0 && <p className="noteMeta empty">No notes match "{filter}".</p>}
+        </div>
         {dupes.length > 0 && (
           <div className="dupesSummary">⚠ {dupes.length} duplicate group(s) across notes</div>
         )}
       </aside>
 
-      {/* Main content: paste panes (top) + envelope form (bottom).
-          Guarded so a render crash in either pane shows a message, not a blank screen. */}
+      {/* Main: envelope bar + Source | Generated panes */}
       <main className="workarea">
-       <PreviewErrorBoundary>
-        {/* Top: always-visible paste notes area */}
-        <section className="pasteSection">
-          <ImportDialog
-            embedded
-            sections={sections}
-            onClose={() => {}}
-            onResult={insertImported}
-          />
-        </section>
-
-        {/* Bottom: note metadata form + toolbar */}
-        <section className="formSection">
+        <PreviewErrorBoundary>
           {draft ? (
             <>
-              <div className="toolbar">
-                <strong>{draft.title || (selectedId ? draft.id : "New note")}</strong>
-                {dirty && <span className="dirty">unsaved</span>}
-                {dupeFlags.size > 0 && (
-                  <span
-                    className="dupeFlag"
-                    title={[...dupeFlags.values()]
-                      .map(
-                        (g) =>
-                          `${g.kind}: also in ${g.occurrences
-                            .filter((o) => o.noteId !== draft.id)
-                            .map((o) => o.noteId)
-                            .join(", ")}`,
-                      )
-                      .join("\n")}
+              {/* Collapsible envelope bar */}
+              <div className="envBar">
+                <div className="toolbar">
+                  <button
+                    className="tiny iconBtn"
+                    aria-label={envOpen ? "Collapse details" : "Expand details"}
+                    title={envOpen ? "Collapse details" : "Expand details"}
+                    onClick={() => setEnvOpen((v) => !v)}
                   >
-                    ⚠ {dupeFlags.size} duplicated block{dupeFlags.size > 1 ? "s" : ""}
-                  </span>
+                    <Chevron open={envOpen} />
+                  </button>
+                  <strong>{draft.title || (selectedId ? draft.id : "New note")}</strong>
+                  <span className="schemaTag" title="Content schema version">v{draft.schemaVersion}</span>
+                  {dirty && <span className="dirty">unsaved</span>}
+                  {dupeFlags.size > 0 && (
+                    <span className="dupeFlag" title={dupeTitle}>
+                      ⚠ {dupeFlags.size} duplicated block{dupeFlags.size > 1 ? "s" : ""}
+                    </span>
+                  )}
+                  <span className="spacer" />
+                  <button
+                    className="toggle tiny"
+                    data-on={syncScroll}
+                    title="Sync scroll between Source and Generated"
+                    onClick={() => setSyncScroll((v) => !v)}
+                  >
+                    ⇅ scroll: {syncScroll ? "linked" : "free"}
+                  </button>
+                  {status && <span className="status inline">{status}</span>}
+                  <button
+                    className="tiny"
+                    title="Undo block change (⌘Z)"
+                    disabled={undoRef.current.length === 0}
+                    onClick={undo}
+                  >
+                    ↶
+                  </button>
+                  <button
+                    className="tiny"
+                    title="Redo block change (⌘⇧Z)"
+                    disabled={redoRef.current.length === 0}
+                    onClick={redo}
+                  >
+                    ↷
+                  </button>
+                  <button onClick={validate} title="Run the strict content build (check-only) — confirms this will deploy">Validate</button>
+                  {selectedId && <button onClick={cloneNote}>Clone</button>}
+                  {selectedId && <button className="danger" onClick={remove}>Delete</button>}
+                  <button className="primary" disabled={!dirty} onClick={save}>Save</button>
+                </div>
+                {draft.schemaVersion < CURRENT_SCHEMA_VERSION && (
+                  <div className="versionWarn">
+                    ⚠ This note is schema v{draft.schemaVersion}; current is v{CURRENT_SCHEMA_VERSION}.
+                    Run <code>npm run migrate</code> to upgrade notes on disk before deploying.
+                  </div>
                 )}
-                <span className="spacer" />
-                {selectedId && <button onClick={cloneNote}>Clone</button>}
-                {selectedId && <button className="danger" onClick={remove}>Delete</button>}
-                <button className="primary" disabled={!dirty} onClick={save}>Save</button>
+                {issues.length > 0 && (
+                  <ul className="issues">
+                    {issues.map((i) => <li key={i}>{i}</li>)}
+                  </ul>
+                )}
+                {warnings.length > 0 && (
+                  <ul className="issues warn">
+                    {warnings.map((w) => <li key={w}>⚠ {w}</li>)}
+                  </ul>
+                )}
+                {envOpen && (
+                  <div className="envScroll">
+                    <EnvelopeForm
+                      note={draft}
+                      onChange={patch}
+                      categories={categories}
+                      domains={domains}
+                      allLabels={allLabels}
+                      noteIds={notes.map((n) => n.id)}
+                      onAddCategory={() => setCatalogOpen(true)}
+                      savedId={selectedId}
+                      assetVer={assetVer}
+                    />
+                  </div>
+                )}
               </div>
-              {status && <div className="status">{status}</div>}
-              {issues.length > 0 && (
-                <ul className="issues">
-                  {issues.map((i) => <li key={i}>{i}</li>)}
-                </ul>
-              )}
-              <div className="formScroll">
-                <EnvelopeForm
-                  note={draft}
-                  onChange={patch}
-                  categories={categories}
-                  domains={domains}
-                  allLabels={allLabels}
-                />
+
+              {/* Source | Generated */}
+              <div className="importPanes" ref={panesRef}>
+                <div className="paneWrap" style={{ width: `${leftPct}%` }}>
+                  <SourcePane targets={targets} onResult={insertImported} textareaRef={srcScrollRef} />
+                </div>
+                <div className="paneDivider" onMouseDown={onDividerMouseDown} title="Drag to resize" />
+                <div className="paneWrap" style={{ width: `${100 - leftPct}%` }}>
+                  <GeneratedPane note={draft} onBody={setBody} dupeFlags={dupeFlags} scrollRef={genScrollRef} onAssetChange={bumpAssets} />
+                </div>
               </div>
             </>
           ) : (
-            <p style={{ padding: "1rem", opacity: 0.5 }}>Loading...</p>
+            <p style={{ padding: "1rem", opacity: 0.5 }}>Loading…</p>
           )}
-        </section>
-       </PreviewErrorBoundary>
+        </PreviewErrorBoundary>
       </main>
 
       {catalogOpen && (
