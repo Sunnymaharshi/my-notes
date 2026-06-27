@@ -63,6 +63,18 @@ function Chevron({ open }: { open: boolean }) {
 /** MIME used when dragging a note in the sidebar to recategorize it. */
 const NOTE_MIME = "application/x-note-id";
 
+function useAdminTheme() {
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    return (localStorage.getItem("admin-theme") as "dark" | "light") ?? "dark";
+  });
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("admin-theme", theme);
+  }, [theme]);
+  const toggle = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
+  return { theme, toggle };
+}
+
 const makeBlank = (cats: Category[]): Note => ({
   schemaVersion: CURRENT_SCHEMA_VERSION,
   id: "",
@@ -76,6 +88,7 @@ const makeBlank = (cats: Category[]): Note => ({
 });
 
 export function App() {
+  const { theme, toggle: toggleTheme } = useAdminTheme();
   const [notes, setNotes] = useState<NoteMeta[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
@@ -483,6 +496,9 @@ export function App() {
       <aside className="sidebar">
         <div className="brand">
           Notes Admin <span className="local">local-only</span>
+          <button className="tiny themeToggle" onClick={toggleTheme} title="Toggle theme">
+            {theme === "dark" ? "☀" : "☾"}
+          </button>
         </div>
         <button className="primary block" onClick={newNote}>+ New note</button>
         <button className="block" onClick={() => setCatalogOpen(true)}>Manage catalog…</button>

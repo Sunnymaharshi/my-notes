@@ -93,20 +93,19 @@
   box-shadow: var(--shadow-1);
 }
 
-/* Optional filename + language header — shares the code background so it blends with the block
-   (no contrasting bar), sitting above the code rather than over it. Only shown when a filename
-   is set; plain code blocks stay header-less. */
+/* Header — always shown; shares code background so it blends (no contrasting bar). */
 .codeHeader {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-3);
-  /* extra right padding keeps the lang label clear of the floating expand button */
-  padding: var(--sp-2) calc(var(--sp-3) + 4.5rem) var(--sp-2) var(--sp-3);
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3) 0;
   background: var(--code-bg);
-  border-bottom: 1px solid var(--border);
   font-family: var(--font-mono);
   font-size: 12px;
+}
+
+.codeHeaderSpacer {
+  flex: 1;
 }
 
 .codeFilename {
@@ -116,7 +115,7 @@
 }
 
 .codeLang {
-  color: var(--text-dim);
+  color: var(--text-faint);
   font-size: 11px;
   text-transform: lowercase;
   letter-spacing: 0.02em;
@@ -134,15 +133,12 @@
   max-height: none;
 }
 
-/* Expand/collapse toggle, floated in the corner (replaces the old title/copy bar). */
+.codeCopyBtn,
 .codeExpandBtn {
-  position: absolute;
-  top: var(--sp-2);
-  right: var(--sp-2);
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-dim);
-  background: var(--bg-elev);
+  background: none;
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   padding: 2px var(--sp-2);
@@ -151,11 +147,14 @@
   transition: opacity var(--dur-1), color var(--dur-1), border-color var(--dur-1);
 }
 
+.code:hover .codeCopyBtn,
 .code:hover .codeExpandBtn,
+.codeCopyBtn:focus-visible,
 .codeExpandBtn:focus-visible {
   opacity: 1;
 }
 
+.codeCopyBtn:hover,
 .codeExpandBtn:hover {
   color: var(--hl);
   border-color: var(--border-strong);
@@ -166,7 +165,7 @@
   padding: var(--sp-3) var(--sp-4);
   overflow-x: auto;
   background: transparent !important;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.62;
 }
 
@@ -196,7 +195,7 @@
   margin: 0;
   padding: var(--sp-3) var(--sp-4);
   overflow-x: auto;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 /* --- callout --- */

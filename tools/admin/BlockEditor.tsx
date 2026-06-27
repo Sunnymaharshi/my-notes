@@ -137,6 +137,8 @@ export function BlockEditor({
 }) {
   const apply: Apply = (fn) => onChange(fn(body));
   const [focus, setFocus] = useState<string | null>(null);
+  const append = (t: BlockNode["type"]) =>
+    apply((b) => insertAt(b, "", body.length, newNode(t)));
 
   return (
     <FocusContext.Provider value={{ path: focus, request: setFocus, clear: () => setFocus(null) }}>
@@ -152,12 +154,12 @@ export function BlockEditor({
           noteId={noteId}
           onAssetChange={onAssetChange}
         />
+        <AddBlockRow onPick={append} />
       </div>
     </FocusContext.Provider>
   );
 }
 
-/** A list of sibling nodes, with a "+" inserter before each and at the end. */
 function NodeList({
   nodes,
   parentPath,
@@ -174,25 +176,20 @@ function NodeList({
   onAssetChange?: () => void;
 }) {
   const childPath = (i: number) => (parentPath ? `${parentPath}.${i}` : String(i));
-  const insertHere = (index: number, t: BlockNode["type"]) =>
-    apply((b) => insertAt(b, parentPath, index, newNode(t)));
 
   return (
     <div className="nodeList">
       {nodes.map((node, i) => (
-        <div key={i}>
-          <Inserter onPick={(t) => insertHere(i, t)} />
-          <NodeEditor
-            node={node}
-            path={childPath(i)}
-            apply={apply}
-            dupeFlags={dupeFlags}
-            noteId={noteId}
-            onAssetChange={onAssetChange}
-          />
-        </div>
+        <NodeEditor
+          key={i}
+          node={node}
+          path={childPath(i)}
+          apply={apply}
+          dupeFlags={dupeFlags}
+          noteId={noteId}
+          onAssetChange={onAssetChange}
+        />
       ))}
-      <Inserter end onPick={(t) => insertHere(nodes.length, t)} />
     </div>
   );
 }
@@ -269,13 +266,16 @@ function NodeEditor({
             ⚠×{dupe.occurrences.length}
           </span>
         )}
-        <button
-          className="railDel danger"
-          title="Delete block"
-          onClick={() => apply((b) => removeAt(b, path))}
-        >
-          ✕
-        </button>
+        {node.type === "outline" && (
+          <button
+            className={`topicBtn${isTopic ? " on" : ""}`}
+            title={isTopic ? "Topic — click to unmark" : "Mark as topic (a standalone, search-deep-linkable unit)"}
+            onClick={() => update({ ...node, role: isTopic ? undefined : "topic" })}
+          >
+            ◆ topic
+          </button>
+        )}
+        <BlockMenu node={node} path={path} apply={apply} />
       </div>
 
       <NodeFields node={node} path={path} apply={apply} update={update} noteId={noteId} onAssetChange={onAssetChange} />
@@ -393,7 +393,6 @@ function OutlineFields({
   update: (n: BlockNode) => void;
 }) {
   const focus = useContext(FocusContext);
-  const isTopic = node.role === "topic";
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
@@ -443,22 +442,7 @@ function OutlineFields({
           onChange={(v) => update({ ...node, text: v })}
           onKeyDown={onKeyDown}
         />
-        <button
-          className={`topicBtn${isTopic ? " on" : ""}`}
-          title={isTopic ? "Topic — click to unmark" : "Mark as topic (a standalone, search-deep-linkable unit)"}
-          onClick={() => update({ ...node, role: isTopic ? undefined : "topic" })}
-        >
-          ◆ topic
-        </button>
       </div>
-      {(node.note !== undefined || isTopic) && (
-        <AutoText
-          value={node.note ?? ""}
-          className="ol-note"
-          placeholder="aside / note (optional)"
-          onChange={(v) => update({ ...node, note: v || undefined })}
-        />
-      )}
     </div>
   );
 }
@@ -687,30 +671,81 @@ function LinkFields({ node, update }: { node: LinkNode; update: (n: BlockNode) =
   );
 }
 
-/** A slim hover-revealed "+" between blocks that opens a compact block-type menu. */
-function Inserter({ onPick, end }: { onPick: (t: BlockNode["type"]) => void; end?: boolean }) {
+type MenuMode = "closed" | "open" | "before" | "after" | "child" | "retype";
+
+/** ⋯ menu in the rail — insert before/after/child + delete. */
+function BlockMenu({ node, path, apply }: { node: BlockNode; path: string; apply: Apply }) {
+  const [mode, setMode] = useState<MenuMode>("closed");
+  const close = () => setMode("closed");
+  const isOutline = node.type === "outline";
+
+  const pick = (t: BlockNode["type"]) => {
+    if (mode === "before") apply((b) => insertBefore(b, path, newNode(t)));
+    else if (mode === "after") apply((b) => insertAfter(b, path, newNode(t)));
+    else if (mode === "child") apply((b) => appendChild(b, path, newNode(t)));
+    else if (mode === "retype") {
+      const next = newNode(t);
+      // preserve text when the shapes overlap
+      if ("text" in node && "text" in next) (next as { text: string }).text = (node as { text: string }).text;
+      apply((b) => replaceAt(b, path, next));
+    }
+    close();
+  };
+
+  const subLabel: Record<string, string> = {
+    before: "Insert before", after: "Insert after", child: "Add child", retype: "Change type to",
+  };
+
+  return (
+    <div className="blockMenuWrap">
+      <button
+        className="menuDots"
+        title="Block actions"
+        onClick={() => setMode((m) => (m === "closed" ? "open" : "closed"))}
+      >
+        ⋮
+      </button>
+      {mode !== "closed" && (
+        <div className="blockMenu" onMouseLeave={close}>
+          {mode === "open" ? (
+            <>
+              <button className="menuItem" onClick={() => setMode("before")}>↑ Insert before</button>
+              <button className="menuItem" onClick={() => setMode("after")}>↓ Insert after</button>
+              {isOutline && <button className="menuItem" onClick={() => setMode("child")}>→ Add child</button>}
+              <button className="menuItem" onClick={() => setMode("retype")}>⇄ Change type</button>
+              <div className="menuDivider" />
+              <button className="menuItem danger" onClick={() => { apply((b) => removeAt(b, path)); close(); }}>
+                Delete block
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="menuLabel">{subLabel[mode]}</div>
+              {TYPES.filter((t) => mode !== "retype" || t !== node.type).map((t) => (
+                <button key={t} className="menuItem" onClick={() => pick(t)}>{t}</button>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Quiet "Add block" row at the bottom of each node list. */
+function AddBlockRow({ onPick }: { onPick: (t: BlockNode["type"]) => void }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className={`inserter${end ? " end" : ""}${open ? " open" : ""}`}>
+    <div className="addBlockRow">
       {open ? (
-        <div className="inserterMenu" onMouseLeave={() => setOpen(false)}>
+        <div className="blockMenu addBlockMenu" onMouseLeave={() => setOpen(false)}>
+          <div className="menuLabel">Block type</div>
           {TYPES.map((t) => (
-            <button
-              key={t}
-              className="tiny"
-              onClick={() => {
-                onPick(t);
-                setOpen(false);
-              }}
-            >
-              {t}
-            </button>
+            <button key={t} className="menuItem" onClick={() => { onPick(t); setOpen(false); }}>{t}</button>
           ))}
         </div>
       ) : (
-        <button className="inserterPlus" title="Insert a block here" onClick={() => setOpen(true)}>
-          +
-        </button>
+        <button className="addBlockBtn" onClick={() => setOpen(true)}>+ Add block</button>
       )}
     </div>
   );

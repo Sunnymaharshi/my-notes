@@ -212,11 +212,7 @@
             {
               "type": "code",
               "lang": "python",
-              "code": "@asynccontextmanager\nasync def lifespan(app: FastAPI):\n    # --- Startup ---\n    app.state.db_pool = await create_pool(DATABASE_URL)\n    app.state.redis = await aioredis.create_redis_pool(REDIS_URL)\n    yield  # App runs here\n    # --- Shutdown ---\n    await app.state.db_pool.close()\n    await app.state.redis.close()\n\napp = FastAPI(lifespan=lifespan)",
-              "highlight": [
-                6,
-                11
-              ]
+              "code": "@asynccontextmanager\nasync def lifespan(app: FastAPI):\n    # --- Startup ---\n    app.state.db_pool = await create_pool(DATABASE_URL)\n    app.state.redis = await aioredis.create_redis_pool(REDIS_URL)\n    yield  # App runs here\n    # --- Shutdown ---\n    await app.state.db_pool.close()\n    await app.state.redis.close()\n\napp = FastAPI(lifespan=lifespan)"
             },
             {
               "type": "outline",

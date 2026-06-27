@@ -119,6 +119,21 @@
   align-items: center;
   gap: 8px;
 }
+.themeToggle {
+  margin-left: auto;
+  font-size: 14px;
+  padding: 2px 6px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text-dim);
+  cursor: pointer;
+  line-height: 1;
+}
+.themeToggle:hover {
+  color: var(--hl);
+  border-color: var(--border-strong);
+}
 .local {
   font-size: 10px;
   font-weight: 600;
@@ -416,7 +431,7 @@ button.toggle[data-on="true"] {
   position: relative;
   border: 1px solid transparent;
   border-radius: 8px;
-  padding: 4px 8px 4px 22px;
+  padding: 4px 8px;
 }
 .inode:hover {
   border-color: var(--border);
@@ -433,8 +448,8 @@ button.toggle[data-on="true"] {
   right: 4px;
   display: none;
   align-items: center;
-  gap: 6px;
-  padding: 1px 4px;
+  gap: 4px;
+  padding: 2px 4px 2px 6px;
   border: 1px solid var(--border);
   border-radius: 7px;
   background: var(--bg);
@@ -466,38 +481,27 @@ button.toggle[data-on="true"] {
   letter-spacing: 0.03em;
   border-radius: 999px;
   color: var(--text-dim);
-  opacity: 0.4;
   flex: none;
-}
-.inode:hover .topicBtn {
-  opacity: 1;
 }
 .topicBtn.on {
   background: var(--accent);
   border-color: var(--accent);
   color: #06121f;
   font-weight: 600;
-  opacity: 1;
 }
 
-/* Drag handle sits in the left gutter, revealed on hover. */
+/* Drag handle — first item in the rail pill. */
 .dragHandle {
-  position: absolute;
-  left: 2px;
-  top: 4px;
   cursor: grab;
   user-select: none;
   font-size: 14px;
   line-height: 1;
   color: var(--text-dim);
-  opacity: 0;
-}
-.inode:hover > .dragHandle,
-.inode:hover .inodeRail .dragHandle {
-  opacity: 0.6;
+  opacity: 0.5;
+  flex: none;
 }
 .dragHandle:hover {
-  opacity: 1 !important;
+  opacity: 1;
 }
 .dragHandle:active {
   cursor: grabbing;
@@ -664,49 +668,82 @@ button.toggle[data-on="true"] {
   gap: 6px;
 }
 
-/* Contextual "+" inserter between blocks. */
-.inserter {
-  display: flex;
-  justify-content: center;
-  height: 8px;
-  align-items: center;
+/* ⋯ block action menu in the rail. */
+.blockMenuWrap {
+  position: relative;
 }
-.inserter.end {
-  height: 16px;
-}
-.inserterPlus {
-  opacity: 0;
-  width: 20px;
-  height: 16px;
-  padding: 0;
+.menuDots {
+  padding: 1px 4px;
+  font-size: 15px;
   line-height: 1;
-  border-radius: 999px;
-  font-size: 14px;
   color: var(--text-dim);
 }
-.nodeList:hover > div > .inserter .inserterPlus,
-.inserter.end .inserterPlus,
-.inserter:hover .inserterPlus,
-.inserter.open .inserterPlus {
-  opacity: 0.55;
-}
-.inserterPlus:hover {
-  opacity: 1 !important;
-  color: var(--accent);
-  border-color: var(--accent);
-}
-.inserter.open {
-  height: auto;
-}
-.inserterMenu {
+.blockMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  flex-direction: column;
+  min-width: 140px;
   padding: 4px;
+  gap: 1px;
+  background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--bg-elev);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+}
+.menuLabel {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-dim);
+  padding: 3px 8px 2px;
+}
+.menuItem {
+  text-align: left;
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 5px;
+  color: var(--text);
+  background: none;
+  border: none;
+}
+.menuItem:hover {
+  background: var(--bg-hover, rgba(255,255,255,0.07));
+}
+.menuItem.danger {
+  color: var(--c-danger, #e05252);
+}
+.menuDivider {
+  height: 1px;
+  background: var(--border);
+  margin: 3px 0;
+}
+
+/* "Add block" row at the bottom of each node list. */
+.addBlockRow {
+  position: relative;
+  margin-top: 2px;
+}
+.addBlockBtn {
+  font-size: 11px;
+  color: var(--text-dim);
+  opacity: 0.45;
+  padding: 2px 8px;
+  border-radius: 5px;
+  letter-spacing: 0.03em;
+  transition: opacity 0.1s, color 0.1s;
+}
+.addBlockBtn:hover,
+.addBlockBtn:focus {
+  opacity: 1;
+  color: var(--accent);
+}
+.addBlockMenu {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
 }
 
 /* Schema-version drift banner. */

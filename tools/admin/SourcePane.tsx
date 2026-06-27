@@ -10,7 +10,7 @@
  * open (App keys this pane by note id), so it never fires from merely opening a note: only
  * deliberate typing/pasting here replaces the body, and ⌘Z undoes it if you didn't mean to.
  */
-import { useEffect, useState, type Ref } from "react";
+import { useEffect, useRef, useState, type Ref } from "react";
 import type { BlockNode } from "../../src/lib/schema.ts";
 import { api } from "./api.ts";
 
@@ -54,13 +54,24 @@ export function SourcePane({
   const [importError, setImportError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Keep a ref to the latest onResult so the mirror effect always calls the current
+  // version without adding it to deps (which would loop: onResult → setDraft → new
+  // onResult prop → re-run effect with same body → setDraft → …).
+  const onResultRef = useRef(onResult);
+  useEffect(() => { onResultRef.current = onResult; });
+
+  // True once the textarea has held content — used to avoid clearing draft on initial mount.
+  const hasHadContent = useRef(false);
+
   // Re-parse the source (debounced) whenever it (or the language) changes.
   useEffect(() => {
     if (!text.trim()) {
+      if (hasHadContent.current) onResultRef.current([], { mode: "replace" });
       setBody(null);
       setImportError(null);
       return;
     }
+    hasHadContent.current = true;
     let cancelled = false;
     setBusy(true);
     const t = setTimeout(() => {
@@ -83,12 +94,11 @@ export function SourcePane({
   // Live: mirror the freshly-parsed source straight into the body (replace). Safe to always
   // fire because the box is empty on note-open (keyed per note in App), so this only runs from
   // deliberate typing/pasting here — never from merely opening a note. ⌘Z restores the old body
-  // if it wasn't intended. onResult is intentionally out of the deps (it's a fresh closure each
-  // App render; including it would loop); the parsed `body` is the trigger.
+  // if it wasn't intended. Uses onResultRef so the latest callback is always invoked without
+  // listing it in deps (which would loop: calling it triggers a setDraft → new onResult prop).
   useEffect(() => {
     if (!body || !body.length) return;
-    onResult(body, { mode: "replace" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    onResultRef.current(body, { mode: "replace" });
   }, [body]);
 
   const status = busy
@@ -126,12 +136,6 @@ export function SourcePane({
       />
       {importError && <div className="paneError">{importError}</div>}
 
-      <div className="sourceInsert">
-        <span className="hint">
-          ⚡ Live — parsed notes fill the Generated pane automatically (replacing the body). Fine-tune
-          or add blocks inline in the Edit tab on the right.
-        </span>
-      </div>
     </div>
   );
 }
