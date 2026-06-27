@@ -1,0 +1,613 @@
+{
+  "schemaVersion": 1,
+  "id": "python-classes",
+  "title": "Python Classes",
+  "category": "python",
+  "labels": [
+    "python",
+    "oop"
+  ],
+  "summary": "An in-depth guide to Python object-oriented programming, detailing dunder methods, MRO, ABCs, Protocols, descriptors, __slots__, lifecycle hooks, and dataclasses.",
+  "difficulty": "advanced",
+  "updated": "2026-06-27",
+  "draft": false,
+  "body": [
+    {
+      "type": "outline",
+      "text": "Classes dunder methods",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "__init__(self)",
+          "children": [
+            {
+              "type": "outline",
+              "text": "used to initialise the properties"
+            },
+            {
+              "type": "outline",
+              "text": "like a constructor"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "self",
+          "children": [
+            {
+              "type": "outline",
+              "text": "object itselt is passed as self"
+            },
+            {
+              "type": "outline",
+              "text": "we can use any name, self is a convention"
+            },
+            {
+              "type": "outline",
+              "text": "we can also call method on obj like"
+            },
+            {
+              "type": "outline",
+              "text": "Student.average(obj)"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "__len__(self)",
+          "children": [
+            {
+              "type": "outline",
+              "text": "can define len functionality"
+            },
+            {
+              "type": "outline",
+              "text": "usage: len(obj)"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "__getitem__(self,i)",
+          "children": [
+            {
+              "type": "outline",
+              "text": "define indexing for object"
+            },
+            {
+              "type": "outline",
+              "text": "usage: obj[0]"
+            },
+            {
+              "type": "outline",
+              "text": "if class has this method we can use objects in for loops"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "__repr__(self)",
+          "children": [
+            {
+              "type": "outline",
+              "text": "used to get object info or structure (for devs)"
+            },
+            {
+              "type": "outline",
+              "text": "ex: <Student {student_name}>"
+            },
+            {
+              "type": "outline",
+              "text": "usage: repr(obj)"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "__str__(self)",
+          "children": [
+            {
+              "type": "outline",
+              "text": "used to return readable string of object(for users)"
+            },
+            {
+              "type": "outline",
+              "text": "ex: Student name is {student_name}"
+            },
+            {
+              "type": "outline",
+              "text": "usage: str(obj)"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "__doc__ property",
+          "children": [
+            {
+              "type": "outline",
+              "text": "returns doc string written inside the class"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "__eq__(self, other) / __hash__(self)",
+          "children": [
+            {
+              "type": "outline",
+              "text": "if you define __eq__, Python sets __hash__ to None (unhashable)"
+            },
+            {
+              "type": "outline",
+              "text": "define both together if you need objects in sets or as dict keys"
+            },
+            {
+              "type": "outline",
+              "text": "frozen dataclasses handle this automatically"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "__enter__ / __exit__",
+          "children": [
+            {
+              "type": "outline",
+              "text": "see context manager section below"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "code",
+      "lang": "python",
+      "code": "class Student:\n    def __init__(self, name, grades):\n        self.name = name\n        self.grades = grades\n\n    def average(self):\n        return sum(self.grades) / len(self.grades)\n\n\najay = Student(\"Ajay Kumar\", [79, 68, 90])\n# print(ajay.name,ajay.grades,ajay.average())\n\n\n# Inheritance\nclass WorkingStudent(Student):\n    def __init__(self, name, grades, salary):\n        super().__init__(name, grades)\n        self.salary = salary\n\n    @property\n    def get_monthly_salary(self):\n        return self.salary * 30\n\n\nrakesh = WorkingStudent(\"Rakesh\", [20, 38, 41], 890)\n# print(rakesh.average())\n# print(rakesh.get_monthly_salary)"
+    },
+    {
+      "type": "outline",
+      "text": "MRO (Method Resolution Order)",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "determines which class's method is called in multiple inheritance"
+        },
+        {
+          "type": "outline",
+          "text": "ClassName.__mro__ shows the full resolution order"
+        },
+        {
+          "type": "outline",
+          "text": "Python uses C3 linearization algorithm for mro",
+          "children": [
+            {
+              "type": "outline",
+              "text": "Children precede parents"
+            },
+            {
+              "type": "outline",
+              "text": "Left-to-right order is preserved"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "super()",
+          "children": [
+            {
+              "type": "outline",
+              "text": "looks at the MRO of the calling object's class"
+            },
+            {
+              "type": "outline",
+              "text": "jumps to the next class in that list."
+            },
+            {
+              "type": "pre",
+              "text": "ex:    A\n     /   \\\n    B     C\n     \\   /\n       D"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "If Python just went strictly \"left-to-right, depth-first,\""
+        },
+        {
+          "type": "outline",
+          "text": "the order would be D -> B -> A -> C -> A."
+        },
+        {
+          "type": "outline",
+          "text": "This is bad because A would be visited before C, meaning C's overridden methods might be ignored."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "class A:\n    def greet(self): print(\"A\")\n\nclass B(A):\n    def greet(self): print(\"B\"); super().greet()\n\nclass C(A):\n    def greet(self): print(\"C\"); super().greet()\n\nclass D(B, C):  # Diamond\n    pass\n\n# D().greet()   → B C A  (each class called once, C3 order)\n# D.__mro__     → (D, B, C, A, object)"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "ABC (Abstract Base Class)",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "subclasses must implement its abstract methods."
+        },
+        {
+          "type": "outline",
+          "text": "runtime enforcement, raises TypeError if not, caught at class creation"
+        },
+        {
+          "type": "outline",
+          "text": "use when you want to guarantee a contract AND share implementation"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "from abc import ABC, abstractmethod\n\n\nclass Storage(ABC):\n    @abstractmethod\n    def save(self, data: str) -> None: ...\n\n    @abstractmethod\n    def load(self, key: str) -> str: ...\n\n    def exists(self, key: str) -> bool:   # shared implementation, not abstract\n        try:\n            self.load(key)\n            return True\n        except KeyError:\n            return False\n\n# Storage()  → TypeError: Can't instantiate abstract class\n\nclass FileStorage(Storage):\n    def save(self, data): pass\n    def load(self, key): return \"\"\n# FileStorage()  → works"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Protocol (duck typing with types)",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "defines an interface without inheritance"
+        },
+        {
+          "type": "outline",
+          "text": "class does not inherit from a Protocol"
+        },
+        {
+          "type": "outline",
+          "text": "has to implement the same methods and attributes"
+        },
+        {
+          "type": "outline",
+          "text": "preferred over ABC for loosely coupled code"
+        },
+        {
+          "type": "outline",
+          "text": "Compile time enforcement"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "from typing import Protocol\n\n\nclass Drawable(Protocol):\n    def draw(self) -> None: ...\n\nclass Circle:\n    def draw(self) -> None:\n        print(\"drawing circle\")\n\ndef render(shape: Drawable) -> None:\n    shape.draw()\n\n# render(Circle())  → works, Circle never inherits Drawable"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "ABC vs Protocol",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "ABC",
+          "children": [
+            {
+              "type": "outline",
+              "text": "enforces contract via inheritance"
+            },
+            {
+              "type": "outline",
+              "text": "error is raised at instantiation if method missing"
+            },
+            {
+              "type": "outline",
+              "text": "can share base implementation (non-abstract methods)"
+            },
+            {
+              "type": "outline",
+              "text": "use when you OWN all the classes and want strict enforcement"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Protocol",
+          "children": [
+            {
+              "type": "outline",
+              "text": "structural / duck typing — no inheritance needed"
+            },
+            {
+              "type": "outline",
+              "text": "type checkers (mypy) catch missing methods, not runtime"
+            },
+            {
+              "type": "outline",
+              "text": "use when",
+              "children": [
+                {
+                  "type": "outline",
+                  "text": "working with third-party classes you can't modify"
+                },
+                {
+                  "type": "outline",
+                  "text": "to keep components loosely coupled"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Rule of thumb:",
+          "children": [
+            {
+              "type": "outline",
+              "text": "own the hierarchy + want runtime safety  → ABC"
+            },
+            {
+              "type": "outline",
+              "text": "type-checking external/unrelated classes → Protocol"
+            },
+            {
+              "type": "outline",
+              "text": "modern codebases prefer Protocol for flexibility"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Descriptors",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "objects that define __get__, __set__, or __delete__"
+        },
+        {
+          "type": "outline",
+          "text": "how @property works under the hood"
+        },
+        {
+          "type": "outline",
+          "text": "useful for reusable validation logic across multiple classes"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "class Positive:\n    def __set_name__(self, owner, name):\n        self.name = name\n    def __get__(self, obj, objtype=None):\n        return getattr(obj, f\"_{self.name}\", None)\n    def __set__(self, obj, value):\n        if value <= 0:\n            raise ValueError(f\"{self.name} must be positive\")\n        setattr(obj, f\"_{self.name}\", value)\n\nclass Product:\n    price = Positive()\n    stock = Positive()\n\n# p = Product()\n# p.price = -1  → ValueError: price must be positive"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "__slots__",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "by default, each instance stores attributes in a __dict__ (a hash map)"
+        },
+        {
+          "type": "outline",
+          "text": "__slots__ replaces that with a fixed C-level array — faster access, less memory"
+        },
+        {
+          "type": "outline",
+          "text": "can't add arbitrary attributes to instances anymore"
+        },
+        {
+          "type": "outline",
+          "text": "useful for classes you create millions of (events, records, nodes)"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "class Point:\n    __slots__ = (\"x\", \"y\")\n    def __init__(self, x, y):\n        self.x = x\n        self.y = y\n# p = Point(1, 2)\n# p.z = 3  → AttributeError"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Object Creation Lifecycle (__new__ vs __init__)",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "__new__ (creator)",
+          "children": [
+            {
+              "type": "outline",
+              "text": "allocates memory and returns new instance (object)"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "__init__ (customizer)",
+          "children": [
+            {
+              "type": "outline",
+              "text": "receives newly created object (as self)"
+            },
+            {
+              "type": "outline",
+              "text": "initializes its attributes."
+            },
+            {
+              "type": "outline",
+              "text": "cannot return anything, it must return None."
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Singleton pattern using __new__"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "class Singleton:\n    _instance = None\n    def __new__(cls, *args, **kwargs):\n        if not cls._instance:\n            cls._instance = super().__new__(cls)\n        return cls._instance\n\n# a = Singleton()\n# b = Singleton()\n# a is b → True"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Metaprogramming & Hooks",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "__init_subclass__",
+          "children": [
+            {
+              "type": "outline",
+              "text": "hook called on the BASE class whenever new subclass is derived from it"
+            },
+            {
+              "type": "outline",
+              "text": "no metaclass needed — cleaner plugin/registry pattern"
+            },
+            {
+              "type": "outline",
+              "text": "cls = the new subclass being created"
+            }
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "class Plugin:\n    _registry: dict = {}\n\n    def __init_subclass__(cls, name: str = \"\", **kwargs):\n        super().__init_subclass__(**kwargs)\n        if name:\n            Plugin._registry[name] = cls\n\nclass AuthPlugin(Plugin, name=\"auth\"): pass\nclass LogPlugin(Plugin, name=\"log\"): pass\n\n# Plugin._registry → {\"auth\": AuthPlugin, \"log\": LogPlugin}\n# frameworks like FastAPI/SQLAlchemy use this to auto-register routes/models"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Metaclasses",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "in python, everything is an object, and that includes classes."
+        },
+        {
+          "type": "outline",
+          "text": "class is an instance of a metaclass"
+        },
+        {
+          "type": "outline",
+          "text": "type: The Ultimate Creator",
+          "children": [
+            {
+              "type": "outline",
+              "text": "By default, the built-in type is the metaclass of every class in Python."
+            },
+            {
+              "type": "outline",
+              "text": "type(MyClass) → <class 'type'>"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "metaclass controls CLASS creation the same way __init__ controls instance creation"
+        },
+        {
+          "type": "outline",
+          "text": "__init_subclass__ covers 90% of metaclass use cases — prefer it"
+        },
+        {
+          "type": "outline",
+          "text": "still encounter metaclasses in: Django ORM, SQLAlchemy, Pydantic v1"
+        },
+        {
+          "type": "outline",
+          "text": "only write one if you need to intercept class dict before the class object exists"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "class SingletonMeta(type):\n    _instances = {}\n    def __call__(cls, *args, **kwargs):\n        if cls not in cls._instances:\n            cls._instances[cls] = super().__call__(*args, **kwargs)\n        return cls._instances[cls]\n\nclass AppConfig(metaclass=SingletonMeta):\n    pass\n\n# AppConfig() is AppConfig()  → True"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "dataclasses",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "auto-generates __init__, __repr__, __eq__ from field annotations"
+        },
+        {
+          "type": "outline",
+          "text": "use for data-holding classes instead of writing boilerplate"
+        },
+        {
+          "type": "outline",
+          "text": "@dataclass(frozen=True) makes it immutable (and hashable)"
+        },
+        {
+          "type": "outline",
+          "text": "field() lets you control defaults, exclude from repr, etc."
+        },
+        {
+          "type": "outline",
+          "text": "Mutable Defaults",
+          "children": [
+            {
+              "type": "outline",
+              "text": "If you try to write tags: list = [], Python will throw a ValueError."
+            },
+            {
+              "type": "outline",
+              "text": "Python evaluates default arguments once when the class is defined"
+            },
+            {
+              "type": "outline",
+              "text": "not when instances are created."
+            },
+            {
+              "type": "outline",
+              "text": "If Python allowed tags: list = [], every single instance of Config"
+            },
+            {
+              "type": "outline",
+              "text": "would share the exact same list in memory"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "default_factory",
+          "children": [
+            {
+              "type": "outline",
+              "text": "expects a callable (a function or class)"
+            },
+            {
+              "type": "outline",
+              "text": "Every time a new Config object is instantiated without a tags argument"
+            },
+            {
+              "type": "outline",
+              "text": "dataclasses call that function list() to generate new, empty list."
+            }
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "from dataclasses import dataclass, field\n\n@dataclass\nclass Config:\n    host: str\n    port: int = 8080\n    tags: list = field(default_factory=list)  # mutable default — never use tags=[]\n\n# c = Config(\"localhost\")\n# Config(host='localhost', port=8080, tags=[])"
+        }
+      ]
+    }
+  ]
+}

@@ -179,6 +179,9 @@
   background: var(--bg-elev-2);
   color: var(--accent);
 }
+.noteList li.dropTarget > .noteItem {
+  border-top: 2px solid var(--accent);
+}
 .noteItem[draggable="true"] {
   cursor: grab;
 }

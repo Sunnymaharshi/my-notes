@@ -25,7 +25,11 @@
     "label": "Python",
     "domain": "backend",
     "color": "#3776ab",
-    "order": 1
+    "order": 1,
+    "noteOrder": [
+      "python-classes",
+      "fastapi"
+    ]
   },
   {
     "id": "node",

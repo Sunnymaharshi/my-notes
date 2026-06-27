@@ -242,7 +242,8 @@ export function parse(text: string, defaultLang: string): BlockNode[] {
       const fenceIndent = indentOf(line);
       const info = trimmed.slice(3).trim();
       const [langPart, ...rest] = info.split(":");
-      const lang = langPart.trim() || defaultLang;
+      // Strip any `@N` depth hint from the lang token before using it.
+      const lang = (langPart.trim().replace(/@\d+/, "").trim()) || defaultLang;
       const filename = rest.join(":").trim() || undefined;
       const codeLines: string[] = [];
       i++;
@@ -252,9 +253,18 @@ export function parse(text: string, defaultLang: string): BlockNode[] {
         i++;
       }
       const code = codeLines.join("\n").replace(/\s+$/, "");
-      const codeNode: BlockNode = { type: "code", lang, code };
-      if (filename) codeNode.filename = filename;
-      addChild(parentFor(fenceIndent), codeNode);
+      const codeNode: BlockNode =
+        lang === "pre"
+          ? { type: "pre", text: code }
+          : { type: "code", lang, code };
+      if (lang !== "pre" && filename) (codeNode as { filename?: string }).filename = filename;
+      // `@N` in the fence info string (e.g. ```python @2) is an explicit depth hint:
+      // treat the block as if it were at indentation depth N (1-based outline levels).
+      // Useful when the fence physically sits at col 0 (e.g. ruff-linted .py files) but
+      // logically belongs under a nested outline node. Without the hint, physical indent wins.
+      const depthMatch = info.match(/@(\d+)/);
+      const effectiveIndent = depthMatch ? Number(depthMatch[1]) * 4 : fenceIndent;
+      addChild(parentFor(effectiveIndent), codeNode);
       continue;
     }
 

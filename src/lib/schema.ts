@@ -230,6 +230,7 @@ export const CategorySchema = z.object({
   color: z.string().optional(),
   icon: z.string().optional(),
   order: z.number().int().default(0),
+  noteOrder: z.array(z.string()).optional(),
 });
 
 export type Category = z.infer<typeof CategorySchema>;

@@ -201,6 +201,7 @@
 /* --- pre (preformatted text / ASCII diagrams) --- */
 .pre {
   margin: var(--sp-3) 0;
+  padding-left: var(--sp-2);
   font-family: var(--font-code);
   font-size: 13px;
   line-height: 1.6;

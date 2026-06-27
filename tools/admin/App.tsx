@@ -105,6 +105,14 @@ export function App() {
   // Bumped on "+ New note" so the keyed Source pane remounts even when selectedId stays null.
   const [sourceNonce, setSourceNonce] = useState(0);
 
+  const persistCategoryNoteOrder = useCallback(async (cat: string, orderedIds: string[]) => {
+    const updated = categories.map((c) =>
+      c.id === cat ? { ...c, noteOrder: orderedIds } : c,
+    );
+    await api.saveCategories(updated, {});
+    setCategories(updated);
+  }, [categories]);
+
   // Source | Generated split: leftPct is the Source pane width.
   const [leftPct, setLeftPct] = useState(46);
   const panesRef = useRef<HTMLDivElement>(null);
@@ -295,6 +303,7 @@ export function App() {
   const selectNote = (id: string) => {
     if (id === selectedId || !confirmDiscard()) return;
     setSelectedId(id);
+    setSourceNonce((n) => n + 1);
   };
 
   const newNote = () => {
@@ -474,7 +483,18 @@ export function App() {
         const [db, ob] = order(b);
         return da - db || oa - ob || a.localeCompare(b);
       })
-      .map((cat) => ({ cat, label: catById.get(cat)?.label ?? cat, notes: byCat.get(cat)! }));
+      .map((cat) => {
+        const raw = byCat.get(cat)!;
+        const noteOrder = catById.get(cat)?.noteOrder;
+        const sorted = noteOrder
+          ? [...raw].sort((a, b) => {
+              const ia = noteOrder.indexOf(a.id);
+              const ib = noteOrder.indexOf(b.id);
+              return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+            })
+          : raw;
+        return { cat, label: catById.get(cat)?.label ?? cat, notes: sorted };
+      });
   }, [visibleNotes, categories, domains]);
 
   const dupeTitle =
@@ -530,7 +550,28 @@ export function App() {
               </div>
               <ul>
                 {g.notes.map((n) => (
-                  <li key={n.id}>
+                  <li key={n.id}
+                    onDragOver={(e) => {
+                      if (!e.dataTransfer.types.includes(NOTE_MIME)) return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      e.currentTarget.classList.add("dropTarget");
+                    }}
+                    onDragLeave={(e) => e.currentTarget.classList.remove("dropTarget")}
+                    onDrop={(e) => {
+                      e.currentTarget.classList.remove("dropTarget");
+                      e.stopPropagation();
+                      const fromId = e.dataTransfer.getData(NOTE_MIME);
+                      if (!fromId || fromId === n.id) return;
+                      // Only reorder within the same category; cross-cat is handled by the header drop.
+                      const ids = g.notes.map((x) => x.id);
+                      if (!ids.includes(fromId)) return;
+                      const next = ids.filter((id) => id !== fromId);
+                      const toIdx = next.indexOf(n.id);
+                      next.splice(toIdx, 0, fromId);
+                      persistCategoryNoteOrder(g.cat, next);
+                    }}
+                  >
                     <button
                       className={n.id === selectedId ? "noteItem active" : "noteItem"}
                       draggable
@@ -649,7 +690,7 @@ export function App() {
                   {/* Keyed by the open note so the paste box (and its live-ownership) resets when
                       you switch notes — a leftover paste can't bleed into another note. */}
                   <SourcePane
-                    key={`${selectedId ?? "new"}:${sourceNonce}`}
+                    key={sourceNonce}
                     onResult={insertImported}
                     onTitle={(t) => { if (!draft?.title?.trim()) patch({ title: t }); }}
                     textareaRef={srcScrollRef}
