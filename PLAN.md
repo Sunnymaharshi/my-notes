@@ -106,3 +106,10 @@ learning UX (Doc/Flashcard views, bookmarks, dark mode); catalog + topics + poli
 - Enhancements: per-topic TOC + prev/next sibling nav; copy-deep-link per topic; SM-2 spaced
   repetition; Mermaid block; hover-prefetch; wiki cross-note links (needs spans/marks);
   print/export-to-Markdown.
+- **Rich presentation components** (deferred, not now): Claude-style display blocks like `tabs`
+  (`{ items:[{label, body[]}] }`), accordions, etc. Each ships as a **new typed block** (type +
+  renderer + editor control) per the extensibility rule — *not* a generic raw-HTML escape hatch.
+- **Rejected — generic `html` node / inline rich text (spans+marks):** an `html` block was
+  considered and dropped (reintroduces presentation-in-content, defeats search indexing, XSS
+  surface, breaks the typed-block discipline). Inline emphasis/links would instead come from the
+  planned `text` spans+marks upgrade if/when needed; both are out of scope for now.

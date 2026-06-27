@@ -29,10 +29,19 @@ externally, by hand, on the already-structured JSON.
 ## Stage 1 — parse (structure)
 
 1. **Prep the source file.** Wrap every code block in ` ``` ` fences (optionally
-   ` ```python `). Everything else stays as your normal indented outline. Files can be
-   `.py` / `.js` / `.ts` / `.txt` / etc. — the container's comment delimiters
-   (`""" """`, `''' '''`, `/* */`) are stripped automatically, and the code language is taken
-   from the fence or the file extension.
+   ` ```python ` or ` ```python:server.py ` to set a filename). Everything else stays as your
+   normal indented outline. Files can be `.py` / `.js` / `.ts` / `.txt` / etc.
+
+   **Comment delimiters are stripped automatically** so you can wrap prose to silence editor
+   warnings: block delimiters (`"""`, `'''`, `/*`, `*/`) anywhere, and line-comment markers
+   (`#`, `//`, `--`) anywhere they stand alone — the note text after them is kept. A ` ``` ` fence
+   may sit even right after a delimiter (`""" ```python`); anything inside a fence is left
+   verbatim. Code language is taken from the fence or the file extension. You can also drop
+   **Markdown pipe tables** and **ASCII trees** (box-drawing `├── └──`) straight into the source —
+   they become `table` nodes and verbatim `code` blocks.
+
+   **Regenerate many notes from one file:** put `=== Title` divider lines between sections (any
+   comment prefix works) and one file emits multiple draft notes — see `tools/convert/README.md`.
 
 2. **Run the converter.** Pick the pattern that matches your case:
 

@@ -39,7 +39,7 @@ Envelope: `schemaVersion, id, title, category, labels[], summary, difficulty?, r
 |---|---|
 | `outline` | `{ text, children?[], note?, role? }` |
 | `text` | `{ text }` — free-form prose paragraph(s); blank line splits paragraphs |
-| `code` | `{ lang, code, highlight?[] }` — scrollable, hover "expand" to full height; no title/copy bar |
+| `code` | `{ lang, code, filename?, highlight?[] }` — scrollable, hover "expand" to full height; no title/copy bar. `filename` (optional) renders a blended header (filename + lang) above the code; absent → header-less |
 | `image` | `{ src, alt, caption? }` |
 | `callout` | `{ variant, text }` |
 | `table` | `{ headers[], rows[][] }` |

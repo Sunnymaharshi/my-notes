@@ -17,7 +17,7 @@ import { EnvelopeForm } from "./EnvelopeForm.tsx";
 import { SourcePane, type InsertTarget } from "./SourcePane.tsx";
 import { GeneratedPane } from "./GeneratedPane.tsx";
 import { CatalogDialog } from "./CatalogDialog.tsx";
-import { flatten, insertNodes } from "./tree-ops.ts";
+import { insertNodes } from "./tree-ops.ts";
 
 class PreviewErrorBoundary extends Component<
   { children: React.ReactNode },
@@ -89,6 +89,8 @@ export function App() {
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [filter, setFilter] = useState("");
   const [envOpen, setEnvOpen] = useState(true);
+  // Bumped on "+ New note" so the keyed Source pane remounts even when selectedId stays null.
+  const [sourceNonce, setSourceNonce] = useState(0);
 
   // Source | Generated split: leftPct is the Source pane width.
   const [leftPct, setLeftPct] = useState(46);
@@ -191,8 +193,6 @@ export function App() {
     () => (draft ? dupeFlagsForNote(draft.id, dupes) : new Map<string, DupeGroup>()),
     [draft, dupes],
   );
-  const targets = useMemo(() => (draft ? flatten(draft.body) : []), [draft]);
-
   // New (unsaved) notes are "dirty" as soon as they have a title or body; saved notes use JSON diff.
   const dirty =
     draft != null &&
@@ -293,6 +293,7 @@ export function App() {
     setWarnings([]);
     setStatus("");
     setEnvOpen(true);
+    setSourceNonce((n) => n + 1);
     resetHistory();
   };
 
@@ -629,7 +630,9 @@ export function App() {
               {/* Source | Generated */}
               <div className="importPanes" ref={panesRef}>
                 <div className="paneWrap" style={{ width: `${leftPct}%` }}>
-                  <SourcePane targets={targets} onResult={insertImported} textareaRef={srcScrollRef} />
+                  {/* Keyed by the open note so the paste box (and its live-ownership) resets when
+                      you switch notes — a leftover paste can't bleed into another note. */}
+                  <SourcePane key={`${selectedId ?? "new"}:${sourceNonce}`} onResult={insertImported} textareaRef={srcScrollRef} />
                 </div>
                 <div className="paneDivider" onMouseDown={onDividerMouseDown} title="Drag to resize" />
                 <div className="paneWrap" style={{ width: `${100 - leftPct}%` }}>

@@ -22,17 +22,29 @@ as one `index.json` per note (schema: `src/lib/schema.ts`).
 writes `content/notes/` through a tiny Node API. **Local-only — never built or deployed.**
 Three panes: note list · editor (envelope form + block editor) · live preview using the real
 site renderer. Saving validates against the same Zod schema as the build before writing
-`index.json`. Features: labels tag-input with autocomplete, image upload (copied into the note
-folder), per-node ⚠ when text/code is duplicated elsewhere, and **Import** (paste raw notes →
-the deterministic parser builds blocks → append or replace). No model is ever called — any AI
-help is external, by hand, on the resulting JSON.
+`index.json`.
+
+The **block editor is inline/preview-like** (the canonical surface for editing existing notes):
+each block renders close to its final look and is edited in place. Chrome stays out of the way —
+a per-node control rail (drag handle · type · delete) on hover, and a single contextual "+"
+inserter between blocks. Structure is by drag **or** keyboard on outlines: `Enter` = new sibling,
+`Tab`/`Shift-Tab` = indent/outdent (change depth), **`Alt+↑`/`Alt+↓` = reorder among siblings**
+(depth unchanged), `Backspace` on an empty line = delete. The topic toggle sits at the line end;
+the optional `note` aside shows only when present or for a topic.
+
+Other features: labels tag-input with autocomplete + Related picker with unknown-id warnings,
+image upload (copied into the note folder), per-node ⚠ when text/code is duplicated elsewhere,
+**Import** (paste raw notes → the deterministic parser builds blocks → fills the editor), and a
+**🤖 Copy AI prompt** button (next to Summary) that copies a prompt carrying the note content
+plus the existing label vocabulary and note ids, for generating summary/labels/related/difficulty
+externally. **No model is ever called** — any AI help is external, by hand, on the resulting JSON.
 
 ## `convert` — notes file → JSON
 
 Deterministic, lossless structural parse: indentation → `outline` tree, ``` fences →
-`code` nodes. The container's comment delimiters (`""" """`, `''' '''`, `/* */`) are
-stripped; code language comes from the fence (```` ```python ````) or the file extension.
-New notes are written with `draft: true`.
+`code` nodes. New notes are written with `draft: true`. Code language comes from the fence info
+string or the file extension; the same parser also powers the admin **Import**, so everything
+below applies there too.
 
 ```
 npm run convert -- path/to/file.py --category python --write
@@ -40,6 +52,23 @@ npm run convert -- path/to/file.py --category python --write
 
 Flags: `--write` (save to `content/notes/<id>/`; omit to preview on stdout), `--id`,
 `--title`, `--category`, `--append <id>`, `--section "Title"`.
+
+**Paste cleanup (outside ``` fences):** all comment delimiters are removed so prose written as
+comments survives. Block delimiters (`"""`, `'''`, `/*`, `*/`) are stripped **anywhere**;
+line-comment markers (`#`, `//`, `--`) are stripped **anywhere they stand alone** (line start or
+whitespace-preceded — so `https://…` / `a--b` are safe), keeping the text after them; blank-line
+runs collapse to one. `;` is **not** a marker. Fences are tokenized on ``` so one may sit
+**anywhere — even right after a delimiter** (`""" ```python`); content between fences is kept
+byte-for-byte and re-emitted on its own line at the opening line's indentation.
+
+**Also recognized:** ```` ```lang:filename ```` sets `code.filename` (shown as a blended header);
+Markdown **pipe tables** (`| a | b |` + `|---|---|`) → `table` nodes; **ASCII trees** (box-drawing
+`├── └── │`) are kept verbatim as a plain `code` block.
+
+**Split one file into many notes:** put `=== Title` divider lines between sections (any comment
+prefix works: `# === …`, `// === …`, `-- === …`). Each section → its own draft note (id slugged
+from the title, or `=== my-id | Title` to set it); `--category` applies to all. `--append` can't
+combine with dividers.
 
 Full procedure (incl. the enrichment stage): `tools/convert/README.md`.
 

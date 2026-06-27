@@ -8,6 +8,12 @@ export function CodeBlock({ node }: { node: CodeNode }) {
 
   return (
     <div className={`${styles.code} ${expanded ? styles.codeExpanded : ""}`}>
+      {node.filename && (
+        <div className={styles.codeHeader}>
+          <span className={styles.codeFilename}>{node.filename}</span>
+          <span className={styles.codeLang}>{node.lang}</span>
+        </div>
+      )}
       {node.codeHtml ? (
         // Pre-highlighted server-side (Shiki); no highlighter ships to the client.
         <div className={styles.shiki} dangerouslySetInnerHTML={{ __html: node.codeHtml }} />

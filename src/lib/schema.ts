@@ -37,6 +37,8 @@ export interface CodeNode {
   type: "code";
   lang: string;
   code: string;
+  /** Optional file name shown faintly inside the code block (no separate header bar). */
+  filename?: string;
   highlight?: number[];
   /** Pre-rendered highlighted HTML, injected server-side at build/dev. Not in source. */
   codeHtml?: string;
@@ -97,6 +99,7 @@ export const CodeNodeSchema = z.object({
   type: z.literal("code"),
   lang: z.string().min(1),
   code: z.string(),
+  filename: z.string().min(1).optional(),
   highlight: z.array(z.number().int().nonnegative()).optional(),
 });
 

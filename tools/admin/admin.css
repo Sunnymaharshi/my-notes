@@ -403,30 +403,57 @@ button.toggle[data-on="true"] {
   color: var(--text-dim);
   font-size: 13px;
 }
-.node {
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  padding: 8px;
+/* ---- inline (preview-like) block editor ---- */
+.inlineBlocks {
+  gap: 0;
+}
+.nodeList {
+  display: flex;
+  flex-direction: column;
+}
+/* Each block reads like its rendered self; chrome stays hidden until hover. */
+.inode {
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 4px 8px 4px 22px;
+}
+.inode:hover {
+  border-color: var(--border);
   background: var(--bg-elev);
 }
-.node-outline {
-  background: var(--bg);
+.inode.is-topic {
+  border-left: 3px solid var(--accent);
 }
-.nodeBar {
-  display: flex;
+
+/* Hover control rail, top-right of the block. */
+.inodeRail {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  display: none;
   align-items: center;
-  gap: 4px;
-  margin-bottom: 6px;
+  gap: 6px;
+  padding: 1px 4px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  z-index: 2;
 }
-.nodeType {
-  font-size: 11px;
+.inode:hover > .inodeRail,
+.inodeRail:hover {
+  display: flex;
+}
+.railType {
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-dim);
 }
-.nodeBar button {
-  padding: 2px 7px;
+.railDel {
+  padding: 1px 6px;
   font-size: 12px;
+  line-height: 1;
 }
 .dupe {
   font-size: 11px;
@@ -434,45 +461,51 @@ button.toggle[data-on="true"] {
   cursor: help;
 }
 .topicBtn {
-  padding: 2px 8px;
+  padding: 1px 8px;
   font-size: 11px;
   letter-spacing: 0.03em;
   border-radius: 999px;
   color: var(--text-dim);
+  opacity: 0.4;
+  flex: none;
+}
+.inode:hover .topicBtn {
+  opacity: 1;
 }
 .topicBtn.on {
   background: var(--accent);
   border-color: var(--accent);
   color: #06121f;
   font-weight: 600;
-}
-/* Topic outline nodes get a left accent so they stand out in the tree. */
-.node.is-topic {
-  border-left: 3px solid var(--accent);
+  opacity: 1;
 }
 
-/* Drag-and-drop reorder: handle + drop-target indicators. */
+/* Drag handle sits in the left gutter, revealed on hover. */
 .dragHandle {
+  position: absolute;
+  left: 2px;
+  top: 4px;
   cursor: grab;
   user-select: none;
-  padding: 0 4px;
   font-size: 14px;
   line-height: 1;
   color: var(--text-dim);
-  opacity: 0.55;
+  opacity: 0;
+}
+.inode:hover > .dragHandle,
+.inode:hover .inodeRail .dragHandle {
+  opacity: 0.6;
 }
 .dragHandle:hover {
-  opacity: 1;
+  opacity: 1 !important;
 }
 .dragHandle:active {
   cursor: grabbing;
 }
-.node {
-  position: relative;
-}
+
 /* before/after = an accent rule on the matching edge; child = an inset accent ring. */
-.node.drop-before::before,
-.node.drop-after::after {
+.inode.drop-before::before,
+.inode.drop-after::after {
   content: "";
   position: absolute;
   left: 4px;
@@ -480,16 +513,200 @@ button.toggle[data-on="true"] {
   height: 3px;
   border-radius: 2px;
   background: var(--accent);
+  z-index: 3;
 }
-.node.drop-before::before {
+.inode.drop-before::before {
   top: -2px;
 }
-.node.drop-after::after {
+.inode.drop-after::after {
   bottom: -2px;
 }
-.node.drop-child {
+.inode.drop-child {
   outline: 2px dashed var(--accent);
   outline-offset: -2px;
+}
+
+/* Inline editable text: border-less, grows with content, reads like the preview. */
+.inlineText {
+  width: 100%;
+  border: none;
+  background: transparent;
+  resize: none;
+  overflow: hidden;
+  padding: 2px 0;
+  color: var(--text);
+  font: inherit;
+  line-height: 1.5;
+}
+.inlineText:focus {
+  outline: none;
+}
+.inlineText::placeholder {
+  color: var(--text-dim);
+  opacity: 0.6;
+}
+.ol-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.ol-text {
+  font-weight: 500;
+}
+.ol-note {
+  font-size: 13px;
+  color: var(--text-dim);
+  padding-left: 10px;
+  border-left: 2px solid var(--border);
+}
+.prose {
+  color: var(--text);
+}
+
+/* Outline children: indented with a guide rail, like the rendered tree. */
+.children {
+  margin-left: 14px;
+  border-left: 1px solid var(--border);
+  padding-left: 6px;
+}
+
+/* Code / callout / card / image / link blocks: compact "looks-like-output" cards. */
+.codeCard {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  overflow: hidden;
+}
+.codeBar {
+  display: flex;
+  gap: 6px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.codeBar .lang {
+  width: 90px;
+}
+.codeBar .filename {
+  width: 150px;
+}
+.codeBar .hl {
+  flex: 1;
+}
+.codeArea {
+  width: 100%;
+  border: none;
+  background: transparent;
+  resize: vertical;
+  padding: 8px;
+}
+.calloutCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-left: 3px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: var(--bg);
+}
+.calloutCard.cv-warning,
+.calloutCard.cv-gotcha {
+  border-left-color: #e3b341;
+}
+.calloutCard.cv-tip {
+  border-left-color: #3fb950;
+}
+.calloutCard.cv-info,
+.calloutCard.cv-note {
+  border-left-color: var(--accent);
+}
+.cvSelect {
+  align-self: flex-start;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.cardCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: var(--bg);
+}
+.cardSide {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.cardLabel {
+  font-weight: 700;
+  color: var(--accent);
+  width: 14px;
+  flex: none;
+  padding-top: 2px;
+}
+.imageCard,
+.linkCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.imagePreview {
+  max-width: 220px;
+  max-height: 140px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.linkCard {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Contextual "+" inserter between blocks. */
+.inserter {
+  display: flex;
+  justify-content: center;
+  height: 8px;
+  align-items: center;
+}
+.inserter.end {
+  height: 16px;
+}
+.inserterPlus {
+  opacity: 0;
+  width: 20px;
+  height: 16px;
+  padding: 0;
+  line-height: 1;
+  border-radius: 999px;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+.nodeList:hover > div > .inserter .inserterPlus,
+.inserter.end .inserterPlus,
+.inserter:hover .inserterPlus,
+.inserter.open .inserterPlus {
+  opacity: 0.55;
+}
+.inserterPlus:hover {
+  opacity: 1 !important;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.inserter.open {
+  height: auto;
+}
+.inserterMenu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
 /* Schema-version drift banner. */
@@ -507,42 +724,6 @@ button.toggle[data-on="true"] {
   border-radius: 4px;
   background: rgba(227, 179, 65, 0.16);
 }
-.fields {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.fields textarea,
-.fields input,
-.fields select {
-  width: 100%;
-}
-.children {
-  margin: 8px 0 4px 18px;
-  padding-left: 10px;
-  border-left: 2px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.addBar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 5px;
-  margin-top: 6px;
-}
-.addBar.subtle {
-  opacity: 0.55;
-}
-.addBar.subtle:hover {
-  opacity: 1;
-}
-.addLabel {
-  font-size: 11px;
-  color: var(--text-dim);
-}
-
 /* table editor */
 .tableEditor table {
   border-collapse: collapse;

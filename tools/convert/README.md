@@ -20,6 +20,51 @@ source is one big topic). Schema: `src/lib/schema.ts`. Worked example:
    `code` nodes, every line preserved. Language is taken from the fence or the file
    extension.
 
+**Paste cleanup (automatic, applied to everything outside ``` fences):**
+- **Block-comment delimiters** (`"""`, `'''`, `/*`, `*/`) are removed **anywhere** on a line, so
+  the prose they wrap survives (`""" Use Redis """` → `Use Redis`) — wrap/scatter them however
+  your raw file needs to avoid editor warnings.
+- **Line-comment markers** (`#`, `//`, `--`) are removed **anywhere** they stand alone (at
+  line start or preceded by whitespace); the note text after them is kept (`keys expire // ttl`
+  → `keys expire ttl`). The whitespace boundary protects `https://…` and `a--b`.
+- **Blank-line runs collapse** to a single blank.
+- **Fences can sit anywhere** — even right after a delimiter (`""" ```python`). The file is
+  tokenized on ``` , so anything between an opening and closing ``` (including real `#` / `//`
+  comments in the code) is kept byte-for-byte; the fence is re-emitted on its own line carrying
+  the opening line's indentation, so the code block nests where you wrote it.
+
+**Also recognised in the source:**
+- **Code filename:** `` ```python:server.py `` sets `code.filename`, shown faintly *inside* the
+  block (no header bar).
+- **Markdown pipe tables** → a `table` node: a `| a | b |` header row immediately followed by a
+  `|---|---|` separator, then the body rows.
+- **ASCII trees** (lines with box-drawing chars `├── └── │`) are kept verbatim as a plain
+  `code` block, so diagrams keep their alignment.
+
+### Splitting one file into many notes (`=== Title` dividers)
+
+When you're prepping raw notes, drop a **divider line** between sections and a single file
+converts into **multiple notes** in one pass — handy for regenerating a whole set. The marker
+is `=== Title`, recognized with or without any leading line-comment prefix, so it stays a
+valid-looking comment in any file type:
+
+```
+# === Redis Caching      (python)
+// === Eviction Policies  (js / ts / go / rust / java)
+-- === Sharding           (sql)
+=== Replication           (plain, inside a """ … """ / /* … */ wrapped block)
+```
+
+- Each section between dividers becomes its own `draft` note; the title comes from the
+  divider line and the **id is slugged from it** (`Redis Caching` → `redis-caching`).
+- Need a specific id? Use `=== my-id | Title` (e.g. `# === redis-cache | Redis Caching`).
+- `--category <c>` applies to every note in the file; set per-note `labels`/`summary` later.
+- Dividers inside ``` fences are ignored. A file with **no** dividers converts as one note
+  (unchanged). `--append` can't be combined with dividers.
+
+Run: `npm run convert -- path/to/notes.py --category <cat> --write` — it writes each note to
+`content/notes/<id>/index.json` and prints the ids. Omit `--write` to preview the JSON array.
+
 ## Stage 2 — enrich (judgment, on the structured JSON)
 
 Edit the generated JSON (or do this in the admin later). Do NOT re-transcribe the raw file.

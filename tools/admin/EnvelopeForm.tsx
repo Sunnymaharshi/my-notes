@@ -5,6 +5,61 @@ import { api } from "./api.ts";
 
 const DIFFICULTIES: Difficulty[] = ["beginner", "intermediate", "advanced"];
 
+/** Flatten a note's body to plain text so the AI prompt carries the actual content. */
+function bodyToText(body: Note["body"], depth = 0): string {
+  const pad = "  ".repeat(depth);
+  return body
+    .map((n) => {
+      switch (n.type) {
+        case "outline":
+          return (
+            `${pad}- ${n.text}${n.note ? ` (${n.note})` : ""}` +
+            (n.children?.length ? "\n" + bodyToText(n.children, depth + 1) : "")
+          );
+        case "text":
+          return `${pad}${n.text}`;
+        case "code":
+          return `${pad}\`\`\`${n.lang}\n${n.code}\n${pad}\`\`\``;
+        case "callout":
+          return `${pad}[${n.variant}] ${n.text}`;
+        case "flashcard":
+          return `${pad}Q: ${n.q} / A: ${n.a}`;
+        case "table":
+          return `${pad}| ${n.headers.join(" | ")} |`;
+        case "link":
+          return `${pad}link: ${n.url}`;
+        case "image":
+          return `${pad}image: ${n.alt}`;
+      }
+    })
+    .join("\n");
+}
+
+/**
+ * Build a copy-paste prompt for an external model (the repo never calls one — locked decision
+ * #3). It carries the note's content plus the existing label vocabulary and note ids so the
+ * model reuses them instead of inventing new ones.
+ */
+function buildAiPrompt(note: Note, allLabels: string[], noteIds: string[]): string {
+  return [
+    `You are helping catalog a developer-notes entry titled "${note.title}" (category: ${note.category}).`,
+    ``,
+    `Based on the note content below, suggest:`,
+    `1. summary — one concise sentence.`,
+    `2. labels — 3-6 lowercase tags. PREFER reusing from the existing vocabulary; only invent one if nothing fits.`,
+    `3. related — ids of other notes that are genuinely related (pick ONLY from the existing ids list; omit if none).`,
+    `4. difficulty — beginner | intermediate | advanced.`,
+    ``,
+    `Return strict JSON: { "summary": string, "labels": string[], "related": string[], "difficulty": string }.`,
+    ``,
+    `Existing labels: ${allLabels.length ? allLabels.join(", ") : "(none yet)"}`,
+    `Existing note ids: ${noteIds.filter((id) => id !== note.id).join(", ") || "(none yet)"}`,
+    ``,
+    `--- NOTE CONTENT ---`,
+    bodyToText(note.body),
+  ].join("\n");
+}
+
 /** View + delete a note's colocated asset files. Keyed on the on-disk (saved) id so the
  *  /content image URLs resolve; hidden for unsaved notes (no folder yet). */
 function AssetManager({ savedId, assetVer }: { savedId: string | null; assetVer: number }) {
@@ -85,7 +140,14 @@ export function EnvelopeForm({
 }) {
   const [labelDraft, setLabelDraft] = useState("");
   const [relatedDraft, setRelatedDraft] = useState("");
+  const [aiCopied, setAiCopied] = useState(false);
   const idSet = new Set(noteIds);
+
+  const copyAiPrompt = async () => {
+    await navigator.clipboard.writeText(buildAiPrompt(note, allLabels, noteIds));
+    setAiCopied(true);
+    setTimeout(() => setAiCopied(false), 1500);
+  };
 
   const related = note.related ?? [];
   const addRelated = (raw: string) => {
@@ -167,7 +229,18 @@ export function EnvelopeForm({
       </div>
 
       <label className="field">
-        <span>Summary</span>
+        <span className="row">
+          Summary
+          <button
+            type="button"
+            className="tiny"
+            title="Copy an AI prompt (note content + existing labels/ids) to generate summary/labels/related"
+            onClick={copyAiPrompt}
+            style={{ marginLeft: "auto" }}
+          >
+            {aiCopied ? "copied ✓" : "🤖 Copy AI prompt"}
+          </button>
+        </span>
         <textarea
           rows={2}
           value={note.summary}

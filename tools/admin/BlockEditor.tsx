@@ -1,10 +1,23 @@
 /**
- * Visual block editor for a note's `body` (PLAN §7). Edits the block-tree through the
- * positional-path ops in tree-ops.ts. Every node carries a toolbar (move/indent/add/delete);
- * outline nodes nest their children recursively. A ⚠ shows when a node's text/code is
- * duplicated elsewhere (§7a), linking to the other locations.
+ * Inline block editor for a note's `body` (PLAN §7). Reads like the preview: each block
+ * renders close to its final look and is edited in place. Chrome stays out of the way —
+ * a per-node control rail (drag handle · type · delete) appears on hover, and a single
+ * contextual "+" inserter sits between blocks (replacing the old three add-bars and the
+ * ↑↓→← buttons). Reordering/nesting is by drag; outlines also take keyboard structure
+ * (Enter = new sibling, Tab/Shift-Tab = indent/outdent, Backspace on empty = delete).
+ *
+ * Edits go through the positional-path ops in tree-ops.ts. A ⚠ shows when a node's text/code
+ * is duplicated elsewhere (§7a), linking to the other locations.
  */
-import { useRef, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import type {
   BlockNode,
   CalloutNode,
@@ -22,6 +35,7 @@ import { api } from "./api.ts";
 import {
   appendChild,
   appendTop,
+  getAt,
   indent,
   insertAfter,
   insertBefore,
@@ -32,7 +46,7 @@ import {
   replaceAt,
 } from "./tree-ops.ts";
 
-/** DnD drop region relative to a node, derived from the pointer's position over its bar. */
+/** DnD drop region relative to a node, derived from the pointer's position over it. */
 type DropPos = "before" | "after" | "child";
 const DND_MIME = "application/x-block-path";
 
@@ -62,6 +76,52 @@ function newNode(type: BlockNode["type"]): BlockNode {
 
 type Apply = (fn: (body: BlockNode[]) => BlockNode[]) => void;
 
+/* ---- focus coordination ----
+ * Structural keyboard edits (Enter/Tab/Backspace) want to land the caret on the node they
+ * just created/moved. The editor publishes a requested path here; the matching textarea
+ * grabs focus on the next render and clears the request. */
+const FocusContext = createContext<{
+  path: string | null;
+  request: (p: string | null) => void;
+  clear: () => void;
+}>({ path: null, request: () => {}, clear: () => {} });
+
+const partsOf = (path: string) => path.split(".").map(Number);
+const join = (p: number[]) => p.join(".");
+/** Sibling path with the last index shifted by delta (no bounds check). */
+const sibling = (path: string, delta: number) => {
+  const p = partsOf(path);
+  p[p.length - 1] += delta;
+  return join(p);
+};
+/** Path the node at `path` will occupy after an indent (becomes last child of prev sibling). */
+function indentTarget(body: BlockNode[], path: string): string | null {
+  const p = partsOf(path);
+  const i = p[p.length - 1];
+  if (i === 0) return null;
+  const prevPath = join([...p.slice(0, -1), i - 1]);
+  const prev = getAt(body, prevPath);
+  if (prev?.type !== "outline") return null;
+  return `${prevPath}.${prev.children?.length ?? 0}`;
+}
+/** Path the node will occupy after an outdent (sibling right after its parent). */
+function outdentTarget(path: string): string | null {
+  const p = partsOf(path);
+  if (p.length < 2) return null;
+  const parentIndex = p[p.length - 2];
+  return join([...p.slice(0, -2), parentIndex + 1]);
+}
+
+/** Insert `node` at `index` within the list addressed by `parentPath` ("" = top level). */
+function insertAt(body: BlockNode[], parentPath: string, index: number, node: BlockNode): BlockNode[] {
+  if (parentPath === "") {
+    return index >= body.length ? appendTop(body, node) : insertBefore(body, String(index), node);
+  }
+  const parent = getAt(body, parentPath);
+  const count = parent?.type === "outline" ? parent.children?.length ?? 0 : 0;
+  return index >= count ? appendChild(body, parentPath, node) : insertBefore(body, `${parentPath}.${index}`, node);
+}
+
 export function BlockEditor({
   body,
   onChange,
@@ -76,21 +136,63 @@ export function BlockEditor({
   onAssetChange?: () => void;
 }) {
   const apply: Apply = (fn) => onChange(fn(body));
+  const [focus, setFocus] = useState<string | null>(null);
+
   return (
-    <div className="blocks">
-      {body.length === 0 && <p className="hint">No blocks yet. Add one below, or import raw notes.</p>}
-      {body.map((node, i) => (
-        <NodeEditor
-          key={i}
-          node={node}
-          path={String(i)}
+    <FocusContext.Provider value={{ path: focus, request: setFocus, clear: () => setFocus(null) }}>
+      <div className="blocks inlineBlocks">
+        {body.length === 0 && (
+          <p className="hint">Nothing here yet. Paste raw notes in Source, or add a block below.</p>
+        )}
+        <NodeList
+          nodes={body}
+          parentPath=""
           apply={apply}
           dupeFlags={dupeFlags}
           noteId={noteId}
           onAssetChange={onAssetChange}
         />
+      </div>
+    </FocusContext.Provider>
+  );
+}
+
+/** A list of sibling nodes, with a "+" inserter before each and at the end. */
+function NodeList({
+  nodes,
+  parentPath,
+  apply,
+  dupeFlags,
+  noteId,
+  onAssetChange,
+}: {
+  nodes: BlockNode[];
+  parentPath: string;
+  apply: Apply;
+  dupeFlags: Map<string, DupeGroup>;
+  noteId: string;
+  onAssetChange?: () => void;
+}) {
+  const childPath = (i: number) => (parentPath ? `${parentPath}.${i}` : String(i));
+  const insertHere = (index: number, t: BlockNode["type"]) =>
+    apply((b) => insertAt(b, parentPath, index, newNode(t)));
+
+  return (
+    <div className="nodeList">
+      {nodes.map((node, i) => (
+        <div key={i}>
+          <Inserter onPick={(t) => insertHere(i, t)} />
+          <NodeEditor
+            node={node}
+            path={childPath(i)}
+            apply={apply}
+            dupeFlags={dupeFlags}
+            noteId={noteId}
+            onAssetChange={onAssetChange}
+          />
+        </div>
       ))}
-      <AddBar onAdd={(t) => onChange(appendTop(body, newNode(t)))} label="Add block" />
+      <Inserter end onPick={(t) => insertHere(nodes.length, t)} />
     </div>
   );
 }
@@ -112,11 +214,10 @@ function NodeEditor({
 }) {
   const update = (next: BlockNode) => apply((b) => replaceAt(b, path, next));
   const dupe = dupeFlags.get(path);
-
   const isTopic = node.type === "outline" && node.role === "topic";
 
-  // Drag-and-drop reorder. The bar is the drag handle and the drop target; the pointer's
-  // vertical position over it picks before / after (and, for outlines, child = nest inside).
+  // Drag-and-drop reorder. The handle is the drag source; the node body is the drop target,
+  // and the pointer's vertical position picks before / after (outlines also nest = child).
   const [dropPos, setDropPos] = useState<DropPos | null>(null);
   const regionFor = (e: React.DragEvent): DropPos => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -146,97 +247,79 @@ function NodeEditor({
   };
 
   return (
-    <div className={`node node-${node.type}${isTopic ? " is-topic" : ""}${dropPos ? ` drop-${dropPos}` : ""}`}>
-      <div
-        className="nodeBar"
-        onDragOver={onDragOver}
-        onDragLeave={() => setDropPos(null)}
-        onDrop={onDrop}
-      >
+    <div
+      className={`inode inode-${node.type}${isTopic ? " is-topic" : ""}${dropPos ? ` drop-${dropPos}` : ""}`}
+      onDragOver={onDragOver}
+      onDragLeave={() => setDropPos(null)}
+      onDrop={onDrop}
+    >
+      <div className="inodeRail" contentEditable={false}>
         <span
           className="dragHandle"
           draggable
           onDragStart={onDragStart}
-          title="Drag to move this block"
+          title="Drag to move / nest this block"
           aria-label="Drag to move"
         >
           ⠿
         </span>
-        <span className="nodeType">{node.type}</span>
-        {node.type === "outline" && (
-          <button
-            className={`topicBtn${isTopic ? " on" : ""}`}
-            title={
-              isTopic
-                ? "Topic — click to unmark"
-                : "Mark as topic (a standalone, search-deep-linkable unit)"
-            }
-            onClick={() =>
-              update({ ...node, role: isTopic ? undefined : "topic" })
-            }
-          >
-            ◆ topic
-          </button>
-        )}
+        <span className="railType">{node.type}</span>
         {dupe && (
           <span className="dupe" title={dupe.occurrences.map((o) => `${o.noteId}#n${o.path}`).join("\n")}>
-            ⚠ duplicate ×{dupe.occurrences.length}
+            ⚠×{dupe.occurrences.length}
           </span>
         )}
-        <span className="spacer" />
-        <button title="Move up" onClick={() => apply((b) => move(b, path, -1))}>↑</button>
-        <button title="Move down" onClick={() => apply((b) => move(b, path, 1))}>↓</button>
-        <button title="Indent (into previous)" onClick={() => apply((b) => indent(b, path))}>→</button>
-        <button title="Outdent" onClick={() => apply((b) => outdent(b, path))}>←</button>
-        <button className="danger" title="Delete" onClick={() => apply((b) => removeAt(b, path))}>✕</button>
+        <button
+          className="railDel danger"
+          title="Delete block"
+          onClick={() => apply((b) => removeAt(b, path))}
+        >
+          ✕
+        </button>
       </div>
 
-      <AddBar onAdd={(t) => apply((b) => insertBefore(b, path, newNode(t)))} label="Add before" subtle />
-
-      <NodeFields node={node} update={update} noteId={noteId} onAssetChange={onAssetChange} />
+      <NodeFields node={node} path={path} apply={apply} update={update} noteId={noteId} onAssetChange={onAssetChange} />
 
       {node.type === "outline" && (
         <div className="children">
-          {node.children?.map((child, i) => (
-            <NodeEditor
-              key={i}
-              node={child}
-              path={`${path}.${i}`}
-              apply={apply}
-              dupeFlags={dupeFlags}
-              noteId={noteId}
-              onAssetChange={onAssetChange}
-            />
-          ))}
-          <AddBar onAdd={(t) => apply((b) => appendChild(b, path, newNode(t)))} label="Add child" />
+          <NodeList
+            nodes={node.children ?? []}
+            parentPath={path}
+            apply={apply}
+            dupeFlags={dupeFlags}
+            noteId={noteId}
+            onAssetChange={onAssetChange}
+          />
         </div>
       )}
-
-      <AddBar onAdd={(t) => apply((b) => insertAfter(b, path, newNode(t)))} label="Add after" subtle />
     </div>
   );
 }
 
 function NodeFields({
   node,
+  path,
+  apply,
   update,
   noteId,
   onAssetChange,
 }: {
   node: BlockNode;
+  path: string;
+  apply: Apply;
   update: (n: BlockNode) => void;
   noteId: string;
   onAssetChange?: () => void;
 }) {
   switch (node.type) {
     case "outline":
-      return <OutlineFields node={node} update={update} />;
+      return <OutlineFields node={node} path={path} apply={apply} update={update} />;
     case "code":
       return <CodeFields node={node} update={update} />;
     case "callout":
       return <CalloutFields node={node} update={update} />;
     case "text":
-      return <TextFields node={node} update={update} />;
+      return <TextFields node={node} path={path} update={update} />;
     case "table":
       return <TableFields node={node} update={update} />;
     case "flashcard":
@@ -248,23 +331,155 @@ function NodeFields({
   }
 }
 
-function OutlineFields({ node, update }: { node: OutlineNode; update: (n: BlockNode) => void }) {
+/** Auto-growing, border-less textarea that reads like prose and honours focus requests. */
+function AutoText({
+  value,
+  onChange,
+  path,
+  className,
+  placeholder,
+  onKeyDown,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  /** When set, focus is granted to this textarea once the editor requests this path. */
+  path?: string;
+  className?: string;
+  placeholder?: string;
+  onKeyDown?: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const focus = useContext(FocusContext);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+
+  useEffect(() => {
+    if (path && focus.path === path && ref.current) {
+      const el = ref.current;
+      el.focus();
+      const len = el.value.length;
+      el.setSelectionRange(len, len);
+      focus.clear();
+    }
+  });
+
   return (
-    <div className="fields">
-      <textarea
-        className="autoGrow"
-        rows={1}
-        placeholder="Outline text"
-        value={node.text}
-        onChange={(e) => update({ ...node, text: e.target.value })}
-      />
-      <textarea
-        rows={2}
-        placeholder="Note (optional aside)"
-        value={node.note ?? ""}
-        onChange={(e) => update({ ...node, note: e.target.value || undefined })}
-      />
+    <textarea
+      ref={ref}
+      rows={1}
+      className={`inlineText ${className ?? ""}`}
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={onKeyDown}
+    />
+  );
+}
+
+function OutlineFields({
+  node,
+  path,
+  apply,
+  update,
+}: {
+  node: OutlineNode;
+  path: string;
+  apply: Apply;
+  update: (n: BlockNode) => void;
+}) {
+  const focus = useContext(FocusContext);
+  const isTopic = node.role === "topic";
+
+  const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+      // Reorder among siblings (depth unchanged); Tab/Shift-Tab change depth instead.
+      e.preventDefault();
+      const dir = e.key === "ArrowUp" ? -1 : 1;
+      focus.request(sibling(path, dir));
+      apply((b) => move(b, path, dir));
+    } else if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      apply((b) => insertAfter(b, path, newNode("outline")));
+      focus.request(sibling(path, 1));
+    } else if (e.key === "Tab" && !e.shiftKey) {
+      e.preventDefault();
+      apply((b) => {
+        const target = indentTarget(b, path);
+        if (target) focus.request(target);
+        return indent(b, path);
+      });
+    } else if (e.key === "Tab" && e.shiftKey) {
+      e.preventDefault();
+      const target = outdentTarget(path);
+      if (target) focus.request(target);
+      apply((b) => outdent(b, path));
+    } else if (
+      e.key === "Backspace" &&
+      node.text === "" &&
+      (e.currentTarget.selectionStart ?? 0) === 0 &&
+      !(node.children && node.children.length)
+    ) {
+      e.preventDefault();
+      const prev = sibling(path, -1);
+      const p = partsOf(path);
+      focus.request(p[p.length - 1] > 0 ? prev : join(p.slice(0, -1)) || null);
+      apply((b) => removeAt(b, path));
+    }
+  };
+
+  return (
+    <div className="ol-fields">
+      <div className="ol-row">
+        <AutoText
+          value={node.text}
+          path={path}
+          className="ol-text"
+          placeholder="Outline line"
+          onChange={(v) => update({ ...node, text: v })}
+          onKeyDown={onKeyDown}
+        />
+        <button
+          className={`topicBtn${isTopic ? " on" : ""}`}
+          title={isTopic ? "Topic — click to unmark" : "Mark as topic (a standalone, search-deep-linkable unit)"}
+          onClick={() => update({ ...node, role: isTopic ? undefined : "topic" })}
+        >
+          ◆ topic
+        </button>
+      </div>
+      {(node.note !== undefined || isTopic) && (
+        <AutoText
+          value={node.note ?? ""}
+          className="ol-note"
+          placeholder="aside / note (optional)"
+          onChange={(v) => update({ ...node, note: v || undefined })}
+        />
+      )}
     </div>
+  );
+}
+
+function TextFields({
+  node,
+  path,
+  update,
+}: {
+  node: TextNode;
+  path: string;
+  update: (n: BlockNode) => void;
+}) {
+  return (
+    <AutoText
+      value={node.text}
+      path={path}
+      className="prose"
+      placeholder="Prose paragraph(s). Blank line = new paragraph."
+      onChange={(v) => update({ ...node, text: v })}
+    />
   );
 }
 
@@ -277,8 +492,8 @@ function CodeFields({ node, update }: { node: CodeNode; update: (n: BlockNode) =
     update({ ...node, highlight: nums.length ? nums : undefined });
   };
   return (
-    <div className="fields">
-      <div className="row">
+    <div className="codeCard">
+      <div className="codeBar">
         <input
           className="lang"
           placeholder="lang"
@@ -286,14 +501,21 @@ function CodeFields({ node, update }: { node: CodeNode; update: (n: BlockNode) =
           onChange={(e) => update({ ...node, lang: e.target.value })}
         />
         <input
+          className="filename"
+          placeholder="filename (optional)"
+          value={node.filename ?? ""}
+          onChange={(e) => update({ ...node, filename: e.target.value || undefined })}
+        />
+        <input
+          className="hl"
           placeholder="highlight lines (e.g. 2,5)"
           value={(node.highlight ?? []).join(", ")}
           onChange={(e) => setHighlight(e.target.value)}
         />
       </div>
       <textarea
-        className="mono"
-        rows={6}
+        className="mono codeArea"
+        rows={4}
         placeholder="code"
         value={node.code}
         onChange={(e) => update({ ...node, code: e.target.value })}
@@ -304,32 +526,23 @@ function CodeFields({ node, update }: { node: CodeNode; update: (n: BlockNode) =
 
 function CalloutFields({ node, update }: { node: CalloutNode; update: (n: BlockNode) => void }) {
   return (
-    <div className="fields">
-      <select value={node.variant} onChange={(e) => update({ ...node, variant: e.target.value as CalloutVariant })}>
+    <div className={`calloutCard cv-${node.variant}`}>
+      <select
+        className="cvSelect"
+        value={node.variant}
+        onChange={(e) => update({ ...node, variant: e.target.value as CalloutVariant })}
+      >
         {VARIANTS.map((v) => (
           <option key={v} value={v}>
             {v}
           </option>
         ))}
       </select>
-      <textarea
-        rows={2}
+      <AutoText
+        value={node.text}
+        className="cvText"
         placeholder="Callout text"
-        value={node.text}
-        onChange={(e) => update({ ...node, text: e.target.value })}
-      />
-    </div>
-  );
-}
-
-function TextFields({ node, update }: { node: TextNode; update: (n: BlockNode) => void }) {
-  return (
-    <div className="fields">
-      <textarea
-        rows={4}
-        placeholder="Prose paragraph(s). Blank line = new paragraph."
-        value={node.text}
-        onChange={(e) => update({ ...node, text: e.target.value })}
+        onChange={(v) => update({ ...node, text: v })}
       />
     </div>
   );
@@ -337,19 +550,15 @@ function TextFields({ node, update }: { node: TextNode; update: (n: BlockNode) =
 
 function FlashcardFields({ node, update }: { node: FlashcardNode; update: (n: BlockNode) => void }) {
   return (
-    <div className="fields">
-      <textarea
-        rows={2}
-        placeholder="Question"
-        value={node.q}
-        onChange={(e) => update({ ...node, q: e.target.value })}
-      />
-      <textarea
-        rows={2}
-        placeholder="Answer"
-        value={node.a}
-        onChange={(e) => update({ ...node, a: e.target.value })}
-      />
+    <div className="cardCard">
+      <div className="cardSide">
+        <span className="cardLabel">Q</span>
+        <AutoText value={node.q} placeholder="Question" onChange={(v) => update({ ...node, q: v })} />
+      </div>
+      <div className="cardSide">
+        <span className="cardLabel">A</span>
+        <AutoText value={node.a} placeholder="Answer" onChange={(v) => update({ ...node, a: v })} />
+      </div>
     </div>
   );
 }
@@ -377,7 +586,7 @@ function TableFields({ node, update }: { node: TableNode; update: (n: BlockNode)
   const delRow = (r: number) => update({ ...node, rows: node.rows.filter((_, i) => i !== r) });
 
   return (
-    <div className="fields tableEditor">
+    <div className="tableEditor">
       <table>
         <thead>
           <tr>
@@ -433,7 +642,8 @@ function ImageFields({
   };
 
   return (
-    <div className="fields">
+    <div className="imageCard">
+      {node.src && <img className="imagePreview" src={`/content/notes/${noteId}/${node.src}`} alt={node.alt} />}
       <div className="row">
         <input
           placeholder="src (e.g. diagram.png)"
@@ -449,11 +659,7 @@ function ImageFields({
           onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])}
         />
       </div>
-      <input
-        placeholder="alt text"
-        value={node.alt}
-        onChange={(e) => update({ ...node, alt: e.target.value })}
-      />
+      <input placeholder="alt text" value={node.alt} onChange={(e) => update({ ...node, alt: e.target.value })} />
       <input
         placeholder="caption (optional)"
         value={node.caption ?? ""}
@@ -465,7 +671,8 @@ function ImageFields({
 
 function LinkFields({ node, update }: { node: LinkNode; update: (n: BlockNode) => void }) {
   return (
-    <div className="fields">
+    <div className="linkCard">
+      <span className="linkIcon">🔗</span>
       <input
         placeholder="url (e.g. https://github.com/…)"
         value={node.url}
@@ -480,23 +687,31 @@ function LinkFields({ node, update }: { node: LinkNode; update: (n: BlockNode) =
   );
 }
 
-function AddBar({
-  onAdd,
-  label,
-  subtle,
-}: {
-  onAdd: (t: BlockNode["type"]) => void;
-  label: string;
-  subtle?: boolean;
-}) {
+/** A slim hover-revealed "+" between blocks that opens a compact block-type menu. */
+function Inserter({ onPick, end }: { onPick: (t: BlockNode["type"]) => void; end?: boolean }) {
+  const [open, setOpen] = useState(false);
   return (
-    <div className={`addBar ${subtle ? "subtle" : ""}`}>
-      <span className="addLabel">{label}:</span>
-      {TYPES.map((t) => (
-        <button key={t} className="tiny" onClick={() => onAdd(t)}>
-          {t}
+    <div className={`inserter${end ? " end" : ""}${open ? " open" : ""}`}>
+      {open ? (
+        <div className="inserterMenu" onMouseLeave={() => setOpen(false)}>
+          {TYPES.map((t) => (
+            <button
+              key={t}
+              className="tiny"
+              onClick={() => {
+                onPick(t);
+                setOpen(false);
+              }}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <button className="inserterPlus" title="Insert a block here" onClick={() => setOpen(true)}>
+          +
         </button>
-      ))}
+      )}
     </div>
   );
 }

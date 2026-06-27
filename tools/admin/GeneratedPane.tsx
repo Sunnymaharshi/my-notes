@@ -6,7 +6,7 @@
  *   - JSON:    an editable, schema-validated JSON view of the body.
  * Editing in any tab flows out through `onBody`; the others stay in sync.
  */
-import { useEffect, useState, type MutableRefObject } from "react";
+import { Component, useEffect, useState, type MutableRefObject, type ReactNode } from "react";
 import { z } from "zod";
 import { BlockNodeSchema, type BlockNode, type Note } from "../../src/lib/schema.ts";
 import type { DupeGroup } from "../../src/lib/dupes.ts";
@@ -14,6 +14,35 @@ import { Preview } from "./Preview.tsx";
 import { BlockEditor } from "./BlockEditor.tsx";
 
 const BodySchema = z.array(BlockNodeSchema);
+
+/**
+ * Isolates a render crash in one tab (typically Preview, which runs the real site
+ * renderer) so it shows an in-pane message instead of unmounting the tab bar. `resetKey`
+ * changes when you switch tabs or edit the body, which clears the error and retries.
+ */
+class TabErrorBoundary extends Component<
+  { resetKey: unknown; children: ReactNode },
+  { error: string | null }
+> {
+  state = { error: null as string | null };
+  static getDerivedStateFromError(e: Error) {
+    return { error: e.message };
+  }
+  componentDidUpdate(prev: { resetKey: unknown }) {
+    if (prev.resetKey !== this.props.resetKey && this.state.error) {
+      this.setState({ error: null });
+    }
+  }
+  render() {
+    if (this.state.error)
+      return (
+        <div className="paneError" style={{ borderTop: "none" }}>
+          Preview error: {this.state.error}
+        </div>
+      );
+    return this.props.children;
+  }
+}
 
 type View = "preview" | "edit" | "json";
 
@@ -83,28 +112,30 @@ export function GeneratedPane({
         ))}
       </div>
 
-      {view === "json" ? (
-        <textarea
-          ref={setScroll}
-          className="mono importArea"
-          spellCheck={false}
-          placeholder="Block JSON. Edits validate live against the schema."
-          value={jsonText}
-          onChange={(e) => onJsonChange(e.target.value)}
-        />
-      ) : view === "edit" ? (
-        <div className="paneBody genEdit" ref={setScroll}>
-          <BlockEditor body={note.body} onChange={onBody} dupeFlags={dupeFlags} noteId={note.id} onAssetChange={onAssetChange} />
-        </div>
-      ) : (
-        <div className="paneBody" ref={setScroll}>
-          {note.body.length ? (
-            <Preview note={note} />
-          ) : (
-            <p className="hint">Nothing to preview yet — add blocks in Edit, or paste in Source.</p>
-          )}
-        </div>
-      )}
+      <TabErrorBoundary resetKey={`${view}:${note.body.length}`}>
+        {view === "json" ? (
+          <textarea
+            ref={setScroll}
+            className="mono importArea"
+            spellCheck={false}
+            placeholder="Block JSON. Edits validate live against the schema."
+            value={jsonText}
+            onChange={(e) => onJsonChange(e.target.value)}
+          />
+        ) : view === "edit" ? (
+          <div className="paneBody genEdit" ref={setScroll}>
+            <BlockEditor body={note.body} onChange={onBody} dupeFlags={dupeFlags} noteId={note.id} onAssetChange={onAssetChange} />
+          </div>
+        ) : (
+          <div className="paneBody" ref={setScroll}>
+            {note.body.length ? (
+              <Preview note={note} />
+            ) : (
+              <p className="hint">Nothing to preview yet — add blocks in Edit, or paste in Source.</p>
+            )}
+          </div>
+        )}
+      </TabErrorBoundary>
 
       {jsonError && <div className="paneError">{jsonError}</div>}
     </div>

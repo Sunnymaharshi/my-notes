@@ -1,16 +1,17 @@
 /**
  * The "Source" half of the studio — a paste/import scratch area. Paste raw indented notes
  * (fence code with ```), pick the source language, and the deterministic parser
- * (tools/convert/parse.ts, via /api/import) builds blocks. Then choose where they land in
- * the note and Insert — the blocks merge into the live body (the Generated pane shows the
- * result). No model is called; any AI enrichment happens externally, by hand, on the JSON.
+ * (tools/convert/parse.ts, via /api/import) builds blocks. No model is called; any AI
+ * enrichment happens externally, by hand, on the JSON.
  *
- * Insert target supports anywhere in the tree: at the end, replacing the whole body, or
- * before / after / inside any existing node (not just top-level sections).
+ * Always live: the parse flows straight into the note body as you type, so the Generated
+ * pane (Preview/Edit/JSON) renders it with no extra click — including re-pastes after you've
+ * tweaked blocks in the Edit tab. The replace is safe because the Source box is empty on
+ * open (App keys this pane by note id), so it never fires from merely opening a note: only
+ * deliberate typing/pasting here replaces the body, and ⌘Z undoes it if you didn't mean to.
  */
 import { useEffect, useState, type Ref } from "react";
 import type { BlockNode } from "../../src/lib/schema.ts";
-import { nodeLabel } from "./tree-ops.ts";
 import { api } from "./api.ts";
 
 const EXTS = [
@@ -25,15 +26,13 @@ const EXTS = [
   [".sh", "bash"],
 ] as const;
 
-/** Where inserted blocks land in the current note. */
+/** Where blocks land in the current note. */
 export type InsertTarget =
   | { mode: "append" }
   | { mode: "replace" }
   | { mode: "before"; path: string }
   | { mode: "after"; path: string }
   | { mode: "child"; path: string };
-
-export type FlatNode = { path: string; depth: number; node: BlockNode };
 
 const countBlocks = (body: BlockNode[]): number =>
   body.reduce(
@@ -42,12 +41,9 @@ const countBlocks = (body: BlockNode[]): number =>
   );
 
 export function SourcePane({
-  targets,
   onResult,
   textareaRef,
 }: {
-  /** Flattened nodes of the current note, for the before/after/inside insert targets. */
-  targets: FlatNode[];
   onResult: (body: BlockNode[], target: InsertTarget) => void;
   /** Source textarea ref, for optional scroll-sync with the Generated pane. */
   textareaRef?: Ref<HTMLTextAreaElement>;
@@ -57,11 +53,6 @@ export function SourcePane({
   const [body, setBody] = useState<BlockNode[] | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [inserted, setInserted] = useState<string | null>(null);
-
-  // Position relative to a node, plus the chosen node path.
-  const [pos, setPos] = useState<InsertTarget["mode"]>("append");
-  const [path, setPath] = useState("");
 
   // Re-parse the source (debounced) whenever it (or the language) changes.
   useEffect(() => {
@@ -89,38 +80,24 @@ export function SourcePane({
     };
   }, [text, ext]);
 
-  // Keep the selected node valid as the tree changes.
-  const needsNode = pos === "before" || pos === "after" || pos === "child";
-  const selected = targets.find((t) => t.path === path) ?? targets[0];
-  const childInvalid = pos === "child" && selected && selected.node.type !== "outline";
-
-  const decodeTarget = (): InsertTarget => {
-    if (pos === "append") return { mode: "append" };
-    if (pos === "replace") return { mode: "replace" };
-    return { mode: pos, path: selected?.path ?? "0" };
-  };
-
-  const ready = Boolean(body && body.length) && (!needsNode || (Boolean(selected) && !childInvalid));
-
-  const apply = () => {
-    if (!body || !ready) return;
-    const n = countBlocks(body);
-    onResult(body, decodeTarget());
-    setInserted(`Inserted ${n} block${n === 1 ? "" : "s"} ✓`);
-    setText("");
-    setBody(null);
-    window.setTimeout(() => setInserted(null), 2500);
-  };
+  // Live: mirror the freshly-parsed source straight into the body (replace). Safe to always
+  // fire because the box is empty on note-open (keyed per note in App), so this only runs from
+  // deliberate typing/pasting here — never from merely opening a note. ⌘Z restores the old body
+  // if it wasn't intended. onResult is intentionally out of the deps (it's a fresh closure each
+  // App render; including it would loop); the parsed `body` is the trigger.
+  useEffect(() => {
+    if (!body || !body.length) return;
+    onResult(body, { mode: "replace" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [body]);
 
   const status = busy
     ? "parsing…"
     : importError
       ? "parse error"
-      : inserted
-        ? inserted
-        : body && body.length
-          ? `${countBlocks(body)} block${countBlocks(body) === 1 ? "" : "s"} parsed`
-          : "paste to parse";
+      : body && body.length
+        ? `${countBlocks(body)} block${countBlocks(body) === 1 ? "" : "s"} live ✓`
+        : "paste to render";
 
   return (
     <div className="importPane">
@@ -143,44 +120,18 @@ export function SourcePane({
       <textarea
         ref={textareaRef}
         className="mono importArea"
-        placeholder={"Paste raw notes here…\n\nTopic\n    Subtopic\n    ```python\n    print('x')\n    ```"}
+        placeholder={"Paste raw notes here — they render live →\n\nTopic\n    Subtopic\n    ```python\n    print('x')\n    ```"}
         value={text}
         onChange={(e) => setText(e.target.value)}
       />
       {importError && <div className="paneError">{importError}</div>}
 
       <div className="sourceInsert">
-        <label className="field inline">
-          <span>Insert</span>
-          <select value={pos} onChange={(e) => setPos(e.target.value as InsertTarget["mode"])}>
-            <option value="append">at end of note</option>
-            <option value="replace">replace whole body</option>
-            <option value="before">before…</option>
-            <option value="after">after…</option>
-            <option value="child">inside (child of)…</option>
-          </select>
-        </label>
-        {needsNode && (
-          <select
-            className="targetNode"
-            value={selected?.path ?? ""}
-            onChange={(e) => setPath(e.target.value)}
-          >
-            {targets.length === 0 && <option value="">(note is empty)</option>}
-            {targets.map((t) => (
-              <option key={t.path} value={t.path}>
-                {" ".repeat(t.depth * 2)}
-                {nodeLabel(t.node)}
-              </option>
-            ))}
-          </select>
-        )}
-        <span className="spacer" />
-        <button className="primary" disabled={!ready} onClick={apply}>
-          Insert
-        </button>
+        <span className="hint">
+          ⚡ Live — parsed notes fill the Generated pane automatically (replacing the body). Fine-tune
+          or add blocks inline in the Edit tab on the right.
+        </span>
       </div>
-      {childInvalid && <div className="paneError">Only outline nodes can hold children — pick before/after instead.</div>}
     </div>
   );
 }

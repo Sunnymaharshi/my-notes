@@ -93,6 +93,35 @@
   box-shadow: var(--shadow-1);
 }
 
+/* Optional filename + language header — shares the code background so it blends with the block
+   (no contrasting bar), sitting above the code rather than over it. Only shown when a filename
+   is set; plain code blocks stay header-less. */
+.codeHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  /* extra right padding keeps the lang label clear of the floating expand button */
+  padding: var(--sp-2) calc(var(--sp-3) + 4.5rem) var(--sp-2) var(--sp-3);
+  background: var(--code-bg);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.codeFilename {
+  color: var(--text);
+  opacity: 0.75;
+  user-select: text;
+}
+
+.codeLang {
+  color: var(--text-dim);
+  font-size: 11px;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+
 /* Large code is capped to a scrollable viewport; .codeExpanded lifts the cap. */
 .code .shiki,
 .code .codePlain {
