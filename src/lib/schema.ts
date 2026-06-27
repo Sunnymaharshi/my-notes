@@ -72,6 +72,11 @@ export interface TextNode {
   text: string;
 }
 
+export interface PreNode {
+  type: "pre";
+  text: string;
+}
+
 export interface TableNode {
   type: "table";
   headers: string[];
@@ -90,6 +95,7 @@ export type BlockNode =
   | ImageNode
   | CalloutNode
   | TextNode
+  | PreNode
   | TableNode
   | FlashcardNode
   | LinkNode;
@@ -127,6 +133,11 @@ export const TextNodeSchema = z.object({
   text: z.string().min(1),
 });
 
+export const PreNodeSchema = z.object({
+  type: z.literal("pre"),
+  text: z.string().min(1),
+});
+
 export const TableNodeSchema = z.object({
   type: z.literal("table"),
   headers: z.array(z.string()).min(1),
@@ -153,6 +164,7 @@ export const BlockNodeSchema: z.ZodType<BlockNode> = z.lazy(() =>
     ImageNodeSchema,
     CalloutNodeSchema,
     TextNodeSchema,
+    PreNodeSchema,
     TableNodeSchema,
     FlashcardNodeSchema,
     LinkNodeSchema,

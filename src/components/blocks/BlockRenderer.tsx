@@ -8,6 +8,7 @@ import { TableBlock } from "./TableBlock.tsx";
 import { Flashcard } from "./Flashcard.tsx";
 import { ImageBlock } from "./ImageBlock.tsx";
 import { LinkBlock } from "./LinkBlock.tsx";
+import { PreBlock } from "./PreBlock.tsx";
 
 function render(node: BlockNode, path: string) {
   switch (node.type) {
@@ -19,6 +20,8 @@ function render(node: BlockNode, path: string) {
       return <Callout node={node} />;
     case "text":
       return <TextBlock node={node} />;
+    case "pre":
+      return <PreBlock node={node} />;
     case "table":
       return <TableBlock node={node} />;
     case "flashcard":

@@ -198,6 +198,20 @@
   font-size: 14px;
 }
 
+/* --- pre (preformatted text / ASCII diagrams) --- */
+.pre {
+  margin: var(--sp-3) 0;
+  font-family: var(--font-code);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-mid);
+  white-space: pre;
+  overflow-x: auto;
+  word-break: normal;
+  overflow-wrap: normal;
+  max-width: 100%;
+}
+
 /* --- callout --- */
 .callout {
   display: flex;

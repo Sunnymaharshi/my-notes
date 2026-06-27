@@ -65,9 +65,9 @@ byte-for-byte and re-emitted on its own line at the opening line's indentation.
 Markdown **pipe tables** (`| a | b |` + `|---|---|`) → `table` nodes; **ASCII trees** (box-drawing
 `├── └── │`) are kept verbatim as a plain `code` block.
 
-**Split one file into many notes:** put `=== Title` divider lines between sections (any comment
-prefix works: `# === …`, `// === …`, `-- === …`). Each section → its own draft note (id slugged
-from the title, or `=== my-id | Title` to set it); `--category` applies to all. `--append` can't
+**Split one file into many notes:** put `~~~ Title` divider lines between sections (any comment
+prefix works: `# ~~~ …`, `// ~~~ …`, `-- ~~~ …`). Each section → its own draft note (id slugged
+from the title, or `~~~ my-id | Title` to set it); `--category` applies to all. `--append` can't
 combine with dividers.
 
 Full procedure (incl. the enrichment stage): `tools/convert/README.md`.

@@ -648,7 +648,12 @@ export function App() {
                 <div className="paneWrap" style={{ width: `${leftPct}%` }}>
                   {/* Keyed by the open note so the paste box (and its live-ownership) resets when
                       you switch notes — a leftover paste can't bleed into another note. */}
-                  <SourcePane key={`${selectedId ?? "new"}:${sourceNonce}`} onResult={insertImported} textareaRef={srcScrollRef} />
+                  <SourcePane
+                    key={`${selectedId ?? "new"}:${sourceNonce}`}
+                    onResult={insertImported}
+                    onTitle={(t) => { if (!draft?.title?.trim()) patch({ title: t }); }}
+                    textareaRef={srcScrollRef}
+                  />
                 </div>
                 <div className="paneDivider" onMouseDown={onDividerMouseDown} title="Drag to resize" />
                 <div className="paneWrap" style={{ width: `${100 - leftPct}%` }}>

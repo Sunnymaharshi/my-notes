@@ -364,6 +364,20 @@ textarea {
 input.lang {
   max-width: 120px;
 }
+.preField {
+  width: 100%;
+  min-height: 6rem;
+  resize: vertical;
+  white-space: pre;
+  overflow-x: auto;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 4px 0;
+}
 
 /* buttons */
 button {

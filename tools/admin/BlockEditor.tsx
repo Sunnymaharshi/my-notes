@@ -27,6 +27,7 @@ import type {
   ImageNode,
   LinkNode,
   OutlineNode,
+  PreNode,
   TableNode,
   TextNode,
 } from "../../src/lib/schema.ts";
@@ -46,12 +47,25 @@ import {
   replaceAt,
 } from "./tree-ops.ts";
 
+/** Recursively flatten an outline node + its children into indented plain-text lines.
+ *  Used when retyping outline → code so no nested content is lost. */
+function flattenOutline(node: OutlineNode, depth: number): string {
+  const indent = "    ".repeat(depth);
+  const lines = [`${indent}${node.text}`];
+  for (const child of node.children ?? []) {
+    if (child.type === "outline") lines.push(flattenOutline(child as OutlineNode, depth + 1));
+    else if ("text" in child) lines.push(`${indent}    ${(child as { text: string }).text}`);
+    else if ("code" in child) lines.push(`${indent}    \`\`\`\n${(child as { code: string }).code}\n${indent}    \`\`\``);
+  }
+  return lines.join("\n");
+}
+
 /** DnD drop region relative to a node, derived from the pointer's position over it. */
 type DropPos = "before" | "after" | "child";
 const DND_MIME = "application/x-block-path";
 
 const VARIANTS: CalloutVariant[] = ["tip", "warning", "info", "note", "gotcha"];
-const TYPES: BlockNode["type"][] = ["outline", "text", "code", "callout", "table", "flashcard", "image", "link"];
+const TYPES: BlockNode["type"][] = ["outline", "text", "pre", "code", "callout", "table", "flashcard", "image", "link"];
 
 function newNode(type: BlockNode["type"]): BlockNode {
   switch (type) {
@@ -63,6 +77,8 @@ function newNode(type: BlockNode["type"]): BlockNode {
       return { type: "callout", variant: "note", text: "" };
     case "text":
       return { type: "text", text: "" };
+    case "pre":
+      return { type: "pre", text: "" };
     case "table":
       return { type: "table", headers: ["", ""], rows: [["", ""]] };
     case "flashcard":
@@ -320,6 +336,8 @@ function NodeFields({
       return <CalloutFields node={node} update={update} />;
     case "text":
       return <TextFields node={node} path={path} update={update} />;
+    case "pre":
+      return <PreFields node={node} update={update} />;
     case "table":
       return <TableFields node={node} update={update} />;
     case "flashcard":
@@ -463,6 +481,17 @@ function TextFields({
       className="prose"
       placeholder="Prose paragraph(s). Blank line = new paragraph."
       onChange={(v) => update({ ...node, text: v })}
+    />
+  );
+}
+
+function PreFields({ node, update }: { node: PreNode; update: (n: BlockNode) => void }) {
+  return (
+    <textarea
+      className="mono preField"
+      value={node.text}
+      placeholder="Preformatted text — whitespace and line breaks are preserved exactly."
+      onChange={(e) => update({ ...node, text: e.target.value })}
     />
   );
 }
@@ -685,8 +714,23 @@ function BlockMenu({ node, path, apply }: { node: BlockNode; path: string; apply
     else if (mode === "child") apply((b) => appendChild(b, path, newNode(t)));
     else if (mode === "retype") {
       const next = newNode(t);
-      // preserve text when the shapes overlap
-      if ("text" in node && "text" in next) (next as { text: string }).text = (node as { text: string }).text;
+      // Cross-type content preservation — carry text/code across shape changes
+      if (node.type === "outline" && (t === "text" || t === "pre" || t === "code")) {
+        const flat = flattenOutline(node as OutlineNode, 0);
+        if (t === "code") { (next as CodeNode).code = flat; (next as CodeNode).lang = "text"; }
+        else (next as TextNode | PreNode).text = flat;
+      } else if (node.type === "code" && (t === "text" || t === "pre")) {
+        (next as TextNode | PreNode).text = (node as CodeNode).code;
+      } else if ((node.type === "text" || node.type === "pre") && t === "code") {
+        (next as CodeNode).code = (node as TextNode | PreNode).text;
+        (next as CodeNode).lang = "text";
+      } else if (node.type === "text" && t === "pre") {
+        (next as PreNode).text = (node as TextNode).text;
+      } else if (node.type === "pre" && t === "text") {
+        (next as TextNode).text = (node as PreNode).text;
+      } else if ("text" in node && "text" in next) {
+        (next as { text: string }).text = (node as { text: string }).text;
+      }
       apply((b) => replaceAt(b, path, next));
     }
     close();

@@ -40,11 +40,29 @@ const countBlocks = (body: BlockNode[]): number =>
     0,
   );
 
+/** Extract a `~~~ Title` or `~~~ id | Title` divider from the first matching line.
+ *  Strips any leading comment prefix (# // -- * """ ''') and removes that line from the text. */
+function extractDivider(raw: string): { title: string; clean: string } | null {
+  const DIVIDER = /^[^\n]*~{3,}[ \t]*(.+?)[ \t]*$/m;
+  const m = raw.match(DIVIDER);
+  if (!m) return null;
+  let title = m[1].trim().replace(/\s*(?:"""|'''|\*\/)\s*$/, "").trim();
+  if (title.includes("|")) title = title.split("|").slice(1).join("|").trim();
+  if (!title) return null;
+  // Remove the matched line (and any trailing newline after it)
+  const clean = raw.slice(0, m.index).replace(/\n$/, "") +
+    raw.slice((m.index ?? 0) + m[0].length).replace(/^\n/, "");
+  return { title, clean };
+}
+
 export function SourcePane({
   onResult,
+  onTitle,
   textareaRef,
 }: {
   onResult: (body: BlockNode[], target: InsertTarget) => void;
+  /** Called with an extracted `~~~ Title` when the paste contains one. */
+  onTitle?: (title: string) => void;
   /** Source textarea ref, for optional scroll-sync with the Generated pane. */
   textareaRef?: Ref<HTMLTextAreaElement>;
 }) {
@@ -59,6 +77,8 @@ export function SourcePane({
   // onResult prop → re-run effect with same body → setDraft → …).
   const onResultRef = useRef(onResult);
   useEffect(() => { onResultRef.current = onResult; });
+  const onTitleRef = useRef(onTitle);
+  useEffect(() => { onTitleRef.current = onTitle; });
 
   // True once the textarea has held content — used to avoid clearing draft on initial mount.
   const hasHadContent = useRef(false);
@@ -132,7 +152,15 @@ export function SourcePane({
         className="mono importArea"
         placeholder={"Paste raw notes here — they render live →\n\nTopic\n    Subtopic\n    ```python\n    print('x')\n    ```"}
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          let val = e.target.value;
+          const extracted = extractDivider(val);
+          if (extracted) {
+            val = extracted.clean;
+            onTitleRef.current?.(extracted.title);
+          }
+          setText(val);
+        }}
       />
       {importError && <div className="paneError">{importError}</div>}
 

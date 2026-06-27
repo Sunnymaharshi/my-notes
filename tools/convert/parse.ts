@@ -19,9 +19,9 @@
  *   npm run convert -- <file> --append <existing-id> [--section "Title"]
  * appends the file's tree as a new top-level section of content/notes/<existing-id>.
  *
- * Splitting one file into many notes: put `=== Title` divider lines between sections (any
- * comment prefix works — `# === …`, `// === …`, `-- === …`). Each section becomes its own
- * draft note (id slugged from the title, or `=== my-id | Title` to set it). `--category`
+ * Splitting one file into many notes: put `~~~ Title` divider lines between sections (any
+ * comment prefix works — `# ~~~ …`, `// ~~~ …`, `-- ~~~ …`). Each section becomes its own
+ * draft note (id slugged from the title, or `~~~ my-id | Title` to set it). `--category`
  * applies to all; with `--write` each note is written to content/notes/<id>/index.json.
  */
 import { promises as fs } from "node:fs";
@@ -153,12 +153,12 @@ export function cleanRawLines(text: string): string[] {
 }
 
 /**
- * A note divider: a line of `=== Title`, recognized with or without any leading line-comment
+ * A note divider: a line of `~~~ Title`, recognized with or without any leading line-comment
  * prefix (`#`, `//`, `--`, `*`) so it reads as a natural comment in any source file.
  * The captured remainder is the note's title; an optional `id | Title` form sets the id
- * explicitly (e.g. `=== redis-cache | Redis Caching`).
+ * explicitly (e.g. `~~~ redis-cache | Redis Caching`).
  */
-const DIVIDER_RE = /^\s*(?:#+|\/\/+|--+|\*)?\s*={3,}\s*(.*)$/;
+const DIVIDER_RE = /^\s*(?:#+|\/\/+|--+|\*)?\s*~{3,}\s*(.*)$/;
 
 export interface RawSegment {
   title?: string;
@@ -247,7 +247,8 @@ export function parse(text: string, defaultLang: string): BlockNode[] {
       const codeLines: string[] = [];
       i++;
       while (i < lines.length && lines[i].trim() !== "```") {
-        codeLines.push(lines[i].replace(/\t/g, TAB).slice(fenceIndent));
+        const l = lines[i].replace(/\t/g, TAB);
+        codeLines.push(l.slice(Math.min(fenceIndent, l.length - l.trimStart().length)));
         i++;
       }
       const code = codeLines.join("\n").replace(/\s+$/, "");
@@ -307,7 +308,7 @@ async function main() {
   if (!file || file.startsWith("--")) {
     console.error(
       "Usage: npm run convert -- <file> [--id <id>] [--title <t>] [--category <c>] [--write]\n" +
-        "       (use `=== Title` divider lines in the file to emit multiple notes at once)",
+        "       (use `~~~ Title` divider lines in the file to emit multiple notes at once)",
     );
     process.exit(1);
   }
@@ -328,7 +329,7 @@ async function main() {
   const multi = segments.length > 1 || segments.some((s) => s.title);
   if (multi) {
     if (arg("append")) {
-      console.error("✖ --append can't be combined with === note dividers (the file is multiple notes).");
+      console.error("✖ --append can't be combined with ~~~ note dividers (the file is multiple notes).");
       process.exit(1);
     }
     const category = arg("category") ?? "uncategorized";
@@ -360,7 +361,7 @@ async function main() {
 
     const dupId = notes.map((n) => n.id).find((id, i, a) => a.indexOf(id) !== i);
     if (dupId) {
-      console.error(`✖ two notes resolve to the same id "${dupId}" — give one an explicit id via \`=== my-id | Title\`.`);
+      console.error(`✖ two notes resolve to the same id "${dupId}" — give one an explicit id via \`~~~ my-id | Title\`.`);
       process.exit(1);
     }
 
@@ -377,6 +378,7 @@ async function main() {
       process.stdout.write(JSON.stringify(notes, null, 2) + "\n");
       console.error(`(${notes.length} notes parsed; re-run with --write to save each to content/notes/<id>/index.json)`);
     }
+
     return;
   }
 

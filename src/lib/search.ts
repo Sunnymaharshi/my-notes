@@ -70,6 +70,8 @@ function nodeText(node: BlockNode): string {
       return node.code;
     case "link":
       return node.text ? `${node.text} ${node.url}` : node.url;
+    case "pre":
+      return node.text;
   }
 }
 

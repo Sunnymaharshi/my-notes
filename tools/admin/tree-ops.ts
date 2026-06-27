@@ -45,6 +45,8 @@ export function nodeLabel(node: BlockNode): string {
       return `image · ${node.src}`;
     case "link":
       return `link · ${node.text || node.url}`;
+    case "pre":
+      return node.text.slice(0, 60) || "(empty pre)";
   }
 }
 
