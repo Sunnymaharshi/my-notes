@@ -659,7 +659,12 @@ export function App() {
                   <button onClick={validate} title="Run the strict content build (check-only) — confirms this will deploy">Validate</button>
                   {selectedId && <button onClick={cloneNote}>Clone</button>}
                   {selectedId && <button className="danger" onClick={remove}>Delete</button>}
-                  <button className="primary" disabled={!canSave} onClick={save} title={!draft?.title.trim() ? "Add a title before saving" : !draft?.category.trim() ? "Select a category before saving" : undefined}>Save</button>
+                  <span
+                    className="saveWrap"
+                    data-tip={!draft?.title.trim() ? "Add a title before saving" : !draft?.category.trim() ? "Select a category before saving" : undefined}
+                  >
+                    <button className="primary" disabled={!canSave} onClick={save}>Save</button>
+                  </span>
                 </div>
                 {draft.schemaVersion < CURRENT_SCHEMA_VERSION && (
                   <div className="versionWarn">

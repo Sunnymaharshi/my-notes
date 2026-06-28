@@ -432,6 +432,31 @@ button:hover:not(:disabled) {
 button:disabled {
   opacity: 0.5;
   cursor: default;
+  pointer-events: none;
+}
+
+.saveWrap {
+  position: relative;
+  display: inline-block;
+}
+.saveWrap[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--bg2);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.saveWrap[data-tip]:hover::after {
+  opacity: 1;
 }
 button.primary {
   background: var(--accent);
