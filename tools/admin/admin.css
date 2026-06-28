@@ -103,6 +103,40 @@
   padding: 10px;
 }
 
+/*
+ * Compact density for the Generated pane (preview + edit) in the admin studio.
+ * Tightens spacing tokens, line-heights, and block margins so roughly the same
+ * content is visible at the same scroll position as the Source textarea,
+ * making proportional scroll-sync feel accurate.
+ * Applied only in admin — production styles are untouched.
+ */
+.adminCompact {
+  --sp-1: 2px;
+  --sp-2: 4px;
+  --sp-3: 6px;
+  --sp-4: 8px;
+  --sp-5: 12px;
+  --sp-6: 18px;
+  --sp-7: 28px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+/* Tighten heading sizes inside compact view */
+.adminCompact h1 { font-size: 1.1em; margin: 4px 0 2px; }
+.adminCompact h2 { font-size: 1em;   margin: 3px 0 2px; }
+.adminCompact h3,
+.adminCompact h4 { font-size: 0.9em; margin: 2px 0 1px; }
+/* Reduce code block padding and font size */
+.adminCompact pre,
+.adminCompact code { font-size: 11px; }
+.adminCompact pre { padding: 6px 8px !important; margin: 4px 0 !important; }
+/* Tighter outline node rows */
+.adminCompact [class*="nodeRow"],
+.adminCompact [class*="row"] { min-height: unset; }
+/* Block-editor cards: tighter gap between cards */
+.adminCompact [class*="blockCard"],
+.adminCompact [class*="block"] + [class*="block"] { margin-top: 2px; }
+
 /* ---- sidebar ---- */
 .sidebar {
   border-right: 1px solid var(--border);
@@ -915,12 +949,97 @@ button.toggle[data-on="true"] {
   border-bottom: 1px solid var(--border);
   background: var(--bg-elev);
 }
+/* CSS Custom Highlight API — right-pane find matches (preview + edit tabs) */
+::highlight(gen-find-all) {
+  background-color: rgba(245, 200, 66, 0.28);
+}
+::highlight(gen-find-active) {
+  background-color: rgba(245, 200, 66, 0.78);
+  color: #1a1a1a;
+}
+
+.findBar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+}
+.findInput {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+}
+.findInput:focus {
+  border-color: var(--accent, #f5c842);
+}
+.findCount {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  min-width: 56px;
+  text-align: right;
+}
+/*
+ * sourceWrap: contains the textarea + the highlight mirror overlay.
+ * Takes the same flex-1 slot the textarea used to occupy directly.
+ */
+.sourceWrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/*
+ * Mirror div: absolutely fills the sourceWrap, rendered behind the textarea.
+ * Mirrors the textarea's exact text with <mark> spans for match highlights.
+ * Text is transparent so only the mark backgrounds are visible — no double-text.
+ */
+.sourceMirror {
+  position: absolute;
+  inset: 0;
+  overflow: hidden; /* scrollTop synced via JS */
+  pointer-events: none;
+  z-index: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  /* Must exactly match .importArea metrics */
+  padding: 6px 8px;
+  line-height: inherit;
+  color: transparent;
+  background: var(--bg);
+}
+.sourceMirror mark {
+  background: color-mix(in srgb, var(--accent, #f5c842) 30%, transparent);
+  color: transparent;
+  border-radius: 2px;
+}
+.sourceMirror mark.active {
+  background: color-mix(in srgb, var(--accent, #f5c842) 75%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--accent, #f5c842) 90%, transparent);
+}
 .importArea {
   flex: 1;
   width: 100%;
   border: none;
   border-radius: 0;
   resize: none;
+  /* Explicit padding so the mirror can match it exactly */
+  padding: 6px 8px;
+  position: relative;
+  z-index: 1;
+}
+/* When the find highlight mirror is active, go transparent so marks show through */
+.importArea.findActive {
+  background: transparent;
 }
 .paneBody {
   flex: 1;

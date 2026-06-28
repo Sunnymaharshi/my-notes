@@ -24,7 +24,7 @@ export function NoteView({ note }: { note: Note }) {
   const [view, setView] = useState<View>("tree");
   const bookmarked = useIsBookmarked(note.id);
   const { hash } = useLocation();
-  const { index } = useContent();
+  const { index, categories } = useContent();
 
   // Resolve related note ids to their metadata (skip ids that don't resolve / are drafts).
   const related = useMemo(() => {
@@ -36,15 +36,23 @@ export function NoteView({ note }: { note: Note }) {
   // Prev/next note within the same category (same title sort as the sidebar),
   // so a note reads as a guided path rather than a dead end.
   const { prevNote, nextNote } = useMemo(() => {
+    const noteOrder = categories.find((c) => c.id === note.category)?.noteOrder;
     const siblings = index
       .filter((n) => n.category === note.category)
-      .sort((a, b) => a.title.localeCompare(b.title));
+      .sort((a, b) => {
+        if (noteOrder) {
+          const ia = noteOrder.indexOf(a.id);
+          const ib = noteOrder.indexOf(b.id);
+          if (ia !== -1 || ib !== -1) return (ia === -1 ? Infinity : ia) - (ib === -1 ? Infinity : ib);
+        }
+        return a.title.localeCompare(b.title);
+      });
     const i = siblings.findIndex((n) => n.id === note.id);
     return {
       prevNote: i > 0 ? siblings[i - 1] : null,
       nextNote: i >= 0 && i < siblings.length - 1 ? siblings[i + 1] : null,
     };
-  }, [index, note.category, note.id]);
+  }, [index, categories, note.category, note.id]);
 
   // Reset to the default view when navigating between notes.
   useEffect(() => setView("tree"), [note.id]);

@@ -57,7 +57,15 @@ export function Layout() {
         label: c?.label ?? id,
         domain: c?.domain ?? "other",
         order: c?.order ?? 99,
-        notes: notes.sort((a, b) => a.title.localeCompare(b.title)),
+        notes: notes.sort((a, b) => {
+          const order = c?.noteOrder;
+          if (order) {
+            const ia = order.indexOf(a.id);
+            const ib = order.indexOf(b.id);
+            if (ia !== -1 || ib !== -1) return (ia === -1 ? Infinity : ia) - (ib === -1 ? Infinity : ib);
+          }
+          return a.title.localeCompare(b.title);
+        }),
       };
     });
 

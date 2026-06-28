@@ -5,34 +5,25 @@ import { api } from "./api.ts";
 
 const DIFFICULTIES: Difficulty[] = ["beginner", "intermediate", "advanced"];
 
-/** Flatten a note's body to plain text so the AI prompt carries the actual content. */
-function bodyToText(body: Note["body"], depth = 0): string {
+/** Extract outline headings up to maxDepth levels for the AI prompt. */
+function bodyToHeadings(body: Note["body"], depth = 0, maxDepth = 2): string {
   const pad = "  ".repeat(depth);
   return body
-    .map((n) => {
-      switch (n.type) {
-        case "outline":
-          return (
-            `${pad}- ${n.text}${n.note ? ` (${n.note})` : ""}` +
-            (n.children?.length ? "\n" + bodyToText(n.children, depth + 1) : "")
-          );
-        case "text":
-          return `${pad}${n.text}`;
-        case "code":
-          return `${pad}\`\`\`${n.lang}\n${n.code}\n${pad}\`\`\``;
-        case "callout":
-          return `${pad}[${n.variant}] ${n.text}`;
-        case "flashcard":
-          return `${pad}Q: ${n.q} / A: ${n.a}`;
-        case "table":
-          return `${pad}| ${n.headers.join(" | ")} |`;
-        case "link":
-          return `${pad}link: ${n.url}`;
-        case "image":
-          return `${pad}image: ${n.alt}`;
-      }
+    .flatMap((n) => {
+      if (n.type !== "outline") return [];
+      const line = `${pad}- ${n.text}`;
+      if (depth + 1 >= maxDepth || !n.children?.length) return [line];
+      const children = bodyToHeadings(n.children, depth + 1, maxDepth);
+      return children ? [line, children] : [line];
     })
     .join("\n");
+}
+
+/** Top-level headings only; expand to 2 levels only when there are very few top-level items. */
+function bodyToText(body: Note["body"]): string {
+  const one = bodyToHeadings(body, 0, 1);
+  if (one.split("\n").length <= 5) return bodyToHeadings(body, 0, 2) || one;
+  return one || "(no outline headings)";
 }
 
 /**
@@ -44,7 +35,7 @@ function buildAiPrompt(note: Note, allLabels: string[], noteIds: string[]): stri
   return [
     `You are helping catalog a developer-notes entry titled "${note.title}" (category: ${note.category}).`,
     ``,
-    `Based on the note content below, suggest:`,
+    `Based on the note's outline headings below (not the full content), suggest:`,
     `1. summary — one concise sentence.`,
     `2. labels — 3-6 lowercase tags. PREFER reusing from the existing vocabulary; Feel free to create new labels as necessary to accurately describe the note content.`,
     `3. related — ids of other notes that are genuinely related (pick ONLY from the existing ids list). If no existing notes are relevant, return an empty list []`,
@@ -55,7 +46,7 @@ function buildAiPrompt(note: Note, allLabels: string[], noteIds: string[]): stri
     `Existing labels: ${allLabels.length ? allLabels.join(", ") : "(none yet)"}`,
     `Existing note ids: ${noteIds.filter((id) => id !== note.id).join(", ") || "(none yet)"}`,
     ``,
-    `--- NOTE CONTENT ---`,
+    `--- NOTE OUTLINE (headings only, not full content) ---`,
     bodyToText(note.body),
   ].join("\n");
 }
@@ -113,6 +104,14 @@ function AssetManager({ savedId, assetVer }: { savedId: string | null; assetVer:
   );
 }
 
+/** Convert a title string to a kebab-case id slug. */
+export function slugify(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export function EnvelopeForm({
   note,
   onChange,
@@ -140,6 +139,8 @@ export function EnvelopeForm({
 }) {
   const [labelDraft, setLabelDraft] = useState("");
   const [relatedDraft, setRelatedDraft] = useState("");
+  // Track whether the user has manually edited the id field; if not, keep it in sync with title.
+  const [idTouched, setIdTouched] = useState(!!savedId);
   const [aiCopied, setAiCopied] = useState(false);
   const idSet = new Set(noteIds);
 
@@ -182,13 +183,30 @@ export function EnvelopeForm({
     <div className="envelope">
       <label className="field">
         <span>Title</span>
-        <input value={note.title} onChange={(e) => onChange({ title: e.target.value })} />
+        <input
+          value={note.title}
+          onChange={(e) => {
+            const title = e.target.value;
+            onChange(idTouched ? { title } : { title, id: slugify(title) });
+          }}
+        />
       </label>
 
       <div className="row">
         <label className="field grow">
           <span>id (folder; kebab-case)</span>
-          <input value={note.id} onChange={(e) => onChange({ id: e.target.value })} />
+          <input
+            value={note.id}
+            onChange={(e) => {
+              setIdTouched(true);
+              onChange({ id: e.target.value });
+            }}
+          />
+          {note.id && noteIds.includes(note.id) && note.id !== savedId && (
+            <span className="hint" style={{ color: "var(--color-error, #c0392b)" }}>
+              ⚠ id already exists
+            </span>
+          )}
         </label>
         <label className="field">
           <span>Category{selectedDomain ? ` · ${selectedDomain.label}` : ""}</span>

@@ -13,8 +13,9 @@ import type { BlockNode, Category, Domain, Note, NoteMeta } from "../../src/lib/
 import { CURRENT_SCHEMA_VERSION } from "../../src/lib/schema.ts";
 import { dupeFlagsForNote, type DupeGroup } from "../../src/lib/dupes.ts";
 import { api, ApiError } from "./api.ts";
-import { EnvelopeForm } from "./EnvelopeForm.tsx";
+import { EnvelopeForm, slugify } from "./EnvelopeForm.tsx";
 import { SourcePane, type InsertTarget } from "./SourcePane.tsx";
+import type { FindMatch } from "./find-utils.ts";
 import { GeneratedPane } from "./GeneratedPane.tsx";
 import { CatalogDialog } from "./CatalogDialog.tsx";
 import { insertNodes } from "./tree-ops.ts";
@@ -79,7 +80,7 @@ const makeBlank = (cats: Category[]): Note => ({
   schemaVersion: CURRENT_SCHEMA_VERSION,
   id: "",
   title: "",
-  category: cats[0]?.id ?? "",
+  category: localStorage.getItem("admin:lastCategory") ?? cats[0]?.id ?? "",
   labels: [],
   summary: "",
   updated: new Date().toISOString().slice(0, 10),
@@ -101,7 +102,7 @@ export function App() {
   const [status, setStatus] = useState("");
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [filter, setFilter] = useState("");
-  const [envOpen, setEnvOpen] = useState(true);
+  const [envOpen, setEnvOpen] = useState(() => localStorage.getItem("admin:envOpen") !== "false");
   // Bumped on "+ New note" so the keyed Source pane remounts even when selectedId stays null.
   const [sourceNonce, setSourceNonce] = useState(0);
 
@@ -114,7 +115,7 @@ export function App() {
   }, [categories]);
 
   // Source | Generated split: leftPct is the Source pane width.
-  const [leftPct, setLeftPct] = useState(46);
+  const [leftPct, setLeftPct] = useState(() => Number(localStorage.getItem("admin:leftPct")) || 46);
   const panesRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
 
@@ -140,11 +141,13 @@ export function App() {
   const [assetVer, setAssetVer] = useState(0);
   const bumpAssets = useCallback(() => setAssetVer((v) => v + 1), []);
 
-  // Optional scroll sync between the Source textarea and the active Generated scroller,
-  // so raw notes and the rendered result can be compared side by side.
+  // Optional scroll sync between the Source textarea and the active Generated scroller.
   const [syncScroll, setSyncScroll] = useState(false);
   const srcScrollRef = useRef<HTMLTextAreaElement>(null);
   const genScrollRef = useRef<HTMLElement | null>(null);
+
+  // Active find match from the Source pane — forwarded to GeneratedPane for right-pane scroll.
+  const [findMatch, setFindMatch] = useState<FindMatch | null>(null);
 
   useEffect(() => {
     if (!syncScroll) return;
@@ -221,7 +224,13 @@ export function App() {
       ? draft.title.trim() !== "" || draft.body.length > 0
       : JSON.stringify(draft) !== original);
 
-  const patch = (p: Partial<Note>) => setDraft((d) => (d ? { ...d, ...p } : d));
+  // Save is only allowed when the note has a title and a category (prevents accidental blank saves).
+  const canSave = dirty && !!draft?.title.trim() && !!draft?.category.trim();
+
+  const patch = (p: Partial<Note>) => {
+    if (p.category) localStorage.setItem("admin:lastCategory", p.category);
+    setDraft((d) => (d ? { ...d, ...p } : d));
+  };
   const setBody = (body: BlockNode[]) =>
     setDraft((d) => {
       if (!d) return d;
@@ -295,6 +304,7 @@ export function App() {
       dragging.current = false;
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      setLeftPct((pct) => { localStorage.setItem("admin:leftPct", String(pct)); return pct; });
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
@@ -608,7 +618,7 @@ export function App() {
                     className="tiny iconBtn"
                     aria-label={envOpen ? "Collapse details" : "Expand details"}
                     title={envOpen ? "Collapse details" : "Expand details"}
-                    onClick={() => setEnvOpen((v) => !v)}
+                    onClick={() => setEnvOpen((v) => { localStorage.setItem("admin:envOpen", String(!v)); return !v; })}
                   >
                     <Chevron open={envOpen} />
                   </button>
@@ -649,7 +659,7 @@ export function App() {
                   <button onClick={validate} title="Run the strict content build (check-only) — confirms this will deploy">Validate</button>
                   {selectedId && <button onClick={cloneNote}>Clone</button>}
                   {selectedId && <button className="danger" onClick={remove}>Delete</button>}
-                  <button className="primary" disabled={!dirty} onClick={save}>Save</button>
+                  <button className="primary" disabled={!canSave} onClick={save} title={!draft?.title.trim() ? "Add a title before saving" : !draft?.category.trim() ? "Select a category before saving" : undefined}>Save</button>
                 </div>
                 {draft.schemaVersion < CURRENT_SCHEMA_VERSION && (
                   <div className="versionWarn">
@@ -692,13 +702,14 @@ export function App() {
                   <SourcePane
                     key={sourceNonce}
                     onResult={insertImported}
-                    onTitle={(t) => { if (!draft?.title?.trim()) patch({ title: t }); }}
+                    onTitle={(t) => { if (!draft?.title?.trim()) patch({ title: t, ...(!draft?.id?.trim() && { id: slugify(t) }) }); }}
                     textareaRef={srcScrollRef}
+                    onFindMatch={setFindMatch}
                   />
                 </div>
                 <div className="paneDivider" onMouseDown={onDividerMouseDown} title="Drag to resize" />
                 <div className="paneWrap" style={{ width: `${100 - leftPct}%` }}>
-                  <GeneratedPane note={draft} onBody={setBody} dupeFlags={dupeFlags} scrollRef={genScrollRef} onAssetChange={bumpAssets} />
+                  <GeneratedPane note={draft} onBody={setBody} dupeFlags={dupeFlags} scrollRef={genScrollRef} onAssetChange={bumpAssets} findMatch={findMatch} />
                 </div>
               </div>
             </>

@@ -8,9 +8,17 @@ export function CategoryPage() {
 
   if (loading) return <div className={styles.dim}>Loading…</div>;
 
+  const noteOrder = categories.find((c) => c.id === category)?.noteOrder;
   const notes = index
     .filter((n) => n.category === category)
-    .sort((a, b) => a.title.localeCompare(b.title));
+    .sort((a, b) => {
+      if (noteOrder) {
+        const ia = noteOrder.indexOf(a.id);
+        const ib = noteOrder.indexOf(b.id);
+        if (ia !== -1 || ib !== -1) return (ia === -1 ? Infinity : ia) - (ib === -1 ? Infinity : ib);
+      }
+      return a.title.localeCompare(b.title);
+    });
 
   return (
     <div className={styles.list}>
