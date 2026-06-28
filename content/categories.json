@@ -21,11 +21,17 @@
     "order": 3
   },
   {
+    "id": "fastapi",
+    "label": "FastAPI",
+    "domain": "backend",
+    "order": 4
+  },
+  {
     "id": "python",
     "label": "Python",
     "domain": "backend",
     "color": "#3776ab",
-    "order": 1,
+    "order": 5,
     "noteOrder": [
       "python-classes",
       "functions-decorators",
@@ -33,6 +39,8 @@
       "resource-management",
       "typing",
       "collections",
+      "exceptions",
+      "modules-packages",
       "fastapi"
     ]
   },
@@ -41,34 +49,34 @@
     "label": "Node.js",
     "domain": "backend",
     "color": "#3c873a",
-    "order": 2
+    "order": 6
   },
   {
     "id": "dsa",
     "label": "DSA",
     "domain": "backend",
     "color": "#16a34a",
-    "order": 3
+    "order": 7
   },
   {
     "id": "system-design",
     "label": "System Design",
     "domain": "system-design",
     "color": "#a855f7",
-    "order": 1
+    "order": 8
   },
   {
     "id": "devops",
     "label": "DevOps",
     "domain": "devops",
     "color": "#2496ed",
-    "order": 1
+    "order": 9
   },
   {
     "id": "cloud",
     "label": "Cloud",
     "domain": "cloud",
     "color": "#ff9900",
-    "order": 1
+    "order": 10
   }
 ]

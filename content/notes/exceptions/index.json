@@ -1,0 +1,255 @@
+{
+  "schemaVersion": 1,
+  "id": "exceptions",
+  "title": "Exceptions",
+  "category": "python",
+  "labels": [
+    "python",
+    "exceptions"
+  ],
+  "summary": "A comprehensive guide to Python exception handling, covering control flow, exception chaining, Python 3.11+ exception groups, and best practices.",
+  "difficulty": "intermediate",
+  "updated": "2026-06-28",
+  "draft": false,
+  "body": [
+    {
+      "type": "outline",
+      "text": "Exceptions",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "BaseException",
+          "children": [
+            {
+              "type": "outline",
+              "text": "root of all exceptions including KeyboardInterrupt, SystemExit"
+            },
+            {
+              "type": "outline",
+              "text": "never catch BaseException unless you're writing a framework/shell"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Exception",
+          "children": [
+            {
+              "type": "outline",
+              "text": "base for all regular exceptions — catch this at most"
+            },
+            {
+              "type": "outline",
+              "text": "always prefer catching specific exceptions over bare except"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Built-in hierarchy (common ones)",
+          "children": [
+            {
+              "type": "pre",
+              "text": "Exception\n├── ValueError       wrong value, right type  (int(\"abc\"))\n├── TypeError        wrong type               (1 + \"a\")\n├── KeyError         missing dict key\n├── IndexError       list index out of range\n├── AttributeError   object has no attribute\n├── RuntimeError     generic runtime error\n├── NotImplementedError  abstract method not implemented\n└── OSError\n    ├── FileNotFoundError\n    ├── PermissionError\n    └── TimeoutError"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Custom exceptions",
+          "children": [
+            {
+              "type": "outline",
+              "text": "inherit from Exception or a specific subclass"
+            },
+            {
+              "type": "outline",
+              "text": "add context via __init__ or extra attributes"
+            },
+            {
+              "type": "outline",
+              "text": "use specific subclasses so callers can catch at right level"
+            }
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "class AppError(Exception):\n    #Base for all app errors — callers can catch this or be specific\n    pass\n\nclass DatabaseError(AppError):\n    def __init__(self, message, query=None):\n        super().__init__(message)\n        self.query = query   # extra context on the exception object\n\nclass RecordNotFoundError(DatabaseError):\n    pass"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Exception chaining",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "raise X from Y",
+          "children": [
+            {
+              "type": "outline",
+              "text": "explicit chain — original traceback preserved and shown"
+            },
+            {
+              "type": "outline",
+              "text": "__cause__ is set, Python prints \"The above exception was the direct cause\""
+            },
+            {
+              "type": "outline",
+              "text": "use when translating low-level errors into domain errors"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "raise X from None",
+          "children": [
+            {
+              "type": "outline",
+              "text": "suppresses original — __cause__ is None, __suppress_context__ = True"
+            },
+            {
+              "type": "outline",
+              "text": "use when original is implementation detail irrelevant to caller"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "implicit chaining (no from)",
+          "children": [
+            {
+              "type": "outline",
+              "text": "if exception raised inside except block without from"
+            },
+            {
+              "type": "outline",
+              "text": "Python auto-chains via __context__"
+            },
+            {
+              "type": "outline",
+              "text": "prints \"During handling of the above exception, another occurred\""
+            },
+            {
+              "type": "outline",
+              "text": "usually unintentional — always use explicit from or from None"
+            }
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "def fetch(key):\n    try:\n        return {}[key]\n    except KeyError as e:\n        raise DatabaseError(f\"record {key!r} not found\") from e\n        # traceback: KeyError → direct cause of → DatabaseError\n\ndef fetch_clean(key):\n    try:\n        return {}[key]\n    except KeyError:\n        raise DatabaseError(f\"record {key!r} not found\") from None\n        # traceback: only DatabaseError — KeyError hidden\n\ndef fetch_implicit(key):\n    try:\n        return {}[key]\n    except KeyError:\n        log = open(\"missing.log\")   # if this fails too\n        # traceback: KeyError context + FileNotFoundError — messy, unintentional"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "try / except / else / finally",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "else",
+          "children": [
+            {
+              "type": "outline",
+              "text": "runs only if no exception was raised in try"
+            },
+            {
+              "type": "outline",
+              "text": "cleaner than putting success logic inside try"
+            },
+            {
+              "type": "outline",
+              "text": "keeps try block minimal — only the risky operation"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "finally always runs",
+          "children": [
+            {
+              "type": "outline",
+              "text": "even if return or exception in try/except"
+            },
+            {
+              "type": "outline",
+              "text": "use for guaranteed cleanup (though prefer context managers)"
+            }
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "def read_config(path):\n    f = None\n    try:\n        f = open(path)          # only risky line in try\n    except FileNotFoundError:\n        return {}\n    else:\n        return f.read()         # runs only on success — not inside try\n    finally:\n        if f:\n            f.close()           # always runs"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Exception groups (Python 3.11+)",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "ExceptionGroup holds multiple exceptions at once"
+        },
+        {
+          "type": "outline",
+          "text": "used in asyncio.TaskGroup when multiple tasks fail simultaneously"
+        },
+        {
+          "type": "outline",
+          "text": "except* syntax handles specific types within the group"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "async def main():\n    async with asyncio.TaskGroup() as tg:\n        tg.create_task(fail_with(ValueError(\"bad value\")))\n        tg.create_task(fail_with(TypeError(\"bad type\")))\n        tg.create_task(fail_with(ValueError(\"another bad value\")))\n\ntry:\n    asyncio.run(main())\nexcept* ValueError as eg:\n    print(eg.exceptions)   # all ValueErrors from the group\nexcept* TypeError as eg:\n    print(eg.exceptions)"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "__tracebacklimit__",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "sys.tracebacklimit = 0 suppresses traceback in output (CLI tools)"
+        },
+        {
+          "type": "outline",
+          "text": "only affects display, not exception chaining internals"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Best practices",
+      "children": [
+        {
+          "type": "outline",
+          "text": "never use bare except, catches KeyboardInterrupt, SystemExit too"
+        },
+        {
+          "type": "outline",
+          "text": "use from e when wrapping, preserves root cause for debugging"
+        },
+        {
+          "type": "outline",
+          "text": "use from None when hiding implementation details from API callers"
+        },
+        {
+          "type": "outline",
+          "text": "prefer contextlib.suppress over try/except/pass for simple ignores"
+        }
+      ]
+    }
+  ]
+}

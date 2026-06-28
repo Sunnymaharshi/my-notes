@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "id": "operators",
+  "title": "Operators",
+  "category": "python",
+  "labels": [
+    "python"
+  ],
+  "summary": "Covers advanced Python operator syntax including the walrus operator for inline assignment and explicit parameter boundary markers for function definitions.",
+  "difficulty": "intermediate",
+  "updated": "2026-06-28",
+  "draft": false,
+  "body": [
+    {
+      "type": "outline",
+      "text": "Assignment expression",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": ":=  (walrus operator)"
+        },
+        {
+          "type": "outline",
+          "text": "assigns and returns a value in a single expression"
+        },
+        {
+          "type": "outline",
+          "text": "avoids calling the same expression twice"
+        },
+        {
+          "type": "outline",
+          "text": "useful in while loops and comprehensions"
+        },
+        {
+          "type": "outline",
+          "text": "use sparingly — can hurt readability if overused"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "import re\n\ndata = [1, 2, 3, 4, 5, 6]\n\n# without walrus — calls len twice or needs extra variable\nwhile len(data) > 3:\n    print(len(data))\n    data.pop()\n\n# with walrus\nwhile (n := len(data)) > 0:\n    print(n)\n    data.pop()\n\n# useful in comprehensions — compute once, filter and use\nresults = [y for x in data if (y := x * 2) > 4]\n\n# useful with re.match — avoid running match twice\npattern = r\"\\d+\"\ntext = \"order 42\"\nif match := re.search(pattern, text):\n    print(match.group())   # only enters if match found"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Argument Boundaries",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "doesn't accept any data itself. acts as a barrier."
+        },
+        {
+          "type": "outline",
+          "text": "Position-Only Boundary (/)",
+          "children": [
+            {
+              "type": "outline",
+              "text": "forces all arguments before it to be positional-only"
+            },
+            {
+              "type": "outline",
+              "text": "users cannot use their names when calling the function."
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Keyword-Only Bounday (*)",
+          "children": [
+            {
+              "type": "outline",
+              "text": "forces all arguments after it to be named-only"
+            }
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "# 'a' and 'b' must be positional. 'c' can be either. 'd' must be a keyword.\ndef my_func(a, b, /, c, *, d):\n    return a + b + c + d\n\n# Valid call:\nmy_func(1, 2, 3, d=4)\n\n# INVALID call (will throw a TypeError):\nmy_func(a=1, b=2, c=3, d=4)"
+        }
+      ]
+    }
+  ]
+}

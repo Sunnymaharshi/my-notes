@@ -1,0 +1,302 @@
+{
+  "schemaVersion": 1,
+  "id": "modules-packages",
+  "title": "Modules & Packages",
+  "category": "python",
+  "labels": [
+    "python",
+    "packages"
+  ],
+  "summary": "An analysis of Python's import system, detailing modules, packages, the role of __init__.py, sys.modules caching, and execution context via __name__.",
+  "difficulty": "beginner",
+  "updated": "2026-06-28",
+  "draft": false,
+  "body": [
+    {
+      "type": "outline",
+      "text": "Module",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "any .py file"
+        },
+        {
+          "type": "outline",
+          "text": "when imported, Python executes the entire file top to bottom"
+        },
+        {
+          "type": "outline",
+          "text": "result is cached in sys.modules — subsequent imports reuse the cache"
+        },
+        {
+          "type": "outline",
+          "text": "importing the same module twice doesn't re-run it"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Package",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "a folder with __init__.py"
+        },
+        {
+          "type": "outline",
+          "text": "__init__.py runs when the package is first imported"
+        },
+        {
+          "type": "outline",
+          "text": "nested packages: src/app/models/ — each folder needs __init__.py"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "sys.modules",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "dict of all imported modules {module_name: module_object}"
+        },
+        {
+          "type": "outline",
+          "text": "import looks here first before hitting the filesystem"
+        },
+        {
+          "type": "outline",
+          "text": "you can inspect or even remove entries (forces re-import) — rarely needed"
+        },
+        {
+          "type": "outline",
+          "text": "import sys; sys.modules.keys() all currently imported modules"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "__init__.py",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "marks a folder as a package — can be empty"
+        },
+        {
+          "type": "outline",
+          "text": "runs once when the package is imported"
+        },
+        {
+          "type": "outline",
+          "text": "three main uses:"
+        },
+        {
+          "type": "outline",
+          "text": "1. Package initialization — setup code on import",
+          "children": [
+            {
+              "type": "outline",
+              "text": "ex: connect to DB, configure logging"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "2. Expose a clean public API — flatten deep imports for users",
+          "children": [
+            {
+              "type": "code",
+              "lang": "python",
+              "code": "# without __init__.py — callers must know internal structure\nfrom src.graphics.renderer import render_player\n\n# with __init__.py re-exporting:\n#src/__init__.py\nfrom .graphics.renderer import render_player\nfrom .audio.player import play_sound\n\n# now callers just write:\nfrom src import render_player"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "3. Control exports with __all__",
+          "children": [
+            {
+              "type": "outline",
+              "text": "defines what gets exported on `from package import *`"
+            },
+            {
+              "type": "outline",
+              "text": "also signals intent \"these are the public names\""
+            },
+            {
+              "type": "outline",
+              "text": "names starting with _ are excluded from * even without __all__"
+            },
+            {
+              "type": "code",
+              "lang": "python",
+              "code": "# src/__init__.py\nfrom .graphics import render_player\nfrom .audio import play_sound\n__all__ = [\"render_player\", \"play_sound\"]  # only these exported on import *"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Imports",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "absolute import",
+          "children": [
+            {
+              "type": "outline",
+              "text": "full path from project root (preferred)"
+            },
+            {
+              "type": "outline",
+              "text": "from src.app.main import app"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "relative import",
+          "children": [
+            {
+              "type": "outline",
+              "text": "relative to current file's location"
+            },
+            {
+              "type": "outline",
+              "text": "from . import utils          same folder"
+            },
+            {
+              "type": "outline",
+              "text": "from .. import config        parent folder"
+            },
+            {
+              "type": "outline",
+              "text": "from .utils import helper    specific name from same folder"
+            },
+            {
+              "type": "outline",
+              "text": "only works inside a package (folder with __init__.py)"
+            },
+            {
+              "type": "outline",
+              "text": "can't use in a top-level script run directly with python file.py"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "import order (Python resolution order)",
+          "children": [
+            {
+              "type": "outline",
+              "text": "1. sys.modules cache"
+            },
+            {
+              "type": "outline",
+              "text": "2. built-in modules (sys, os, math)"
+            },
+            {
+              "type": "outline",
+              "text": "3. frozen modules"
+            },
+            {
+              "type": "outline",
+              "text": "4. sys.path directories (project root, site-packages, etc.)"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "circular imports",
+          "children": [
+            {
+              "type": "outline",
+              "text": "A imports B, B imports A — ImportError or partially initialized module"
+            },
+            {
+              "type": "outline",
+              "text": "fix 1: restructure — move shared code to a third module C"
+            },
+            {
+              "type": "outline",
+              "text": "fix 2: move the import inside the function (lazy import)"
+            },
+            {
+              "type": "outline",
+              "text": "fix 3: TYPE_CHECKING guard for type-hint-only imports"
+            },
+            {
+              "type": "code",
+              "lang": "python",
+              "code": "# lazy import to break circular dependency\ndef get_user():\n    from src.models import User  # imported only when function is called\n    return User()"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "__name__",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "every module has a __name__ attribute set automatically"
+        },
+        {
+          "type": "outline",
+          "text": "when run directly",
+          "children": [
+            {
+              "type": "outline",
+              "text": "__name__ == \"__main__\""
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "when imported",
+          "children": [
+            {
+              "type": "outline",
+              "text": "__name__ == module's dotted path"
+            },
+            {
+              "type": "outline",
+              "text": "ex: \"src.app.main\""
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "if __name__ == \"__main__\": guard",
+          "children": [
+            {
+              "type": "outline",
+              "text": "code inside only runs when file is executed directly"
+            },
+            {
+              "type": "outline",
+              "text": "not when imported as a module"
+            },
+            {
+              "type": "outline",
+              "text": "use for: CLI entrypoints, manual tests, script mode"
+            }
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "def main():\n    print(\"running\")\n\nif __name__ == \"__main__\":\n    main()   # only runs when executed directly, not on import"
+        }
+      ]
+    }
+  ]
+}

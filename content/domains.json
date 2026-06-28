@@ -1,8 +1,38 @@
 [
-  { "id": "frontend", "label": "Frontend", "color": "#61dafb", "order": 1 },
-  { "id": "backend", "label": "Backend", "color": "#3776ab", "order": 2 },
-  { "id": "system-design", "label": "System Design", "color": "#a855f7", "order": 3 },
-  { "id": "devops", "label": "DevOps", "color": "#2496ed", "order": 4 },
-  { "id": "ai", "label": "AI", "color": "#16a34a", "order": 5 },
-  { "id": "cloud", "label": "Cloud", "color": "#ff9900", "order": 6 }
+  {
+    "id": "frontend",
+    "label": "Frontend",
+    "color": "#61dafb",
+    "order": 1
+  },
+  {
+    "id": "backend",
+    "label": "Backend",
+    "color": "#3776ab",
+    "order": 2
+  },
+  {
+    "id": "system-design",
+    "label": "System Design",
+    "color": "#a855f7",
+    "order": 3
+  },
+  {
+    "id": "devops",
+    "label": "DevOps",
+    "color": "#2496ed",
+    "order": 4
+  },
+  {
+    "id": "ai",
+    "label": "AI",
+    "color": "#16a34a",
+    "order": 5
+  },
+  {
+    "id": "cloud",
+    "label": "Cloud",
+    "color": "#ff9900",
+    "order": 6
+  }
 ]

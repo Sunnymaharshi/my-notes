@@ -18,6 +18,7 @@ import { SourcePane, type InsertTarget } from "./SourcePane.tsx";
 import type { FindMatch } from "./find-utils.ts";
 import { GeneratedPane } from "./GeneratedPane.tsx";
 import { CatalogDialog } from "./CatalogDialog.tsx";
+import { DupesDialog } from "./DupesDialog.tsx";
 import { insertNodes } from "./tree-ops.ts";
 
 class PreviewErrorBoundary extends Component<
@@ -101,6 +102,7 @@ export function App() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [status, setStatus] = useState("");
   const [catalogOpen, setCatalogOpen] = useState(false);
+  const [dupesOpen, setDupesOpen] = useState(false);
   const [filter, setFilter] = useState("");
   const [envOpen, setEnvOpen] = useState(() => localStorage.getItem("admin:envOpen") !== "false");
   // Bumped on "+ New note" so the keyed Source pane remounts even when selectedId stays null.
@@ -602,7 +604,14 @@ export function App() {
           {visibleNotes.length === 0 && <p className="noteMeta empty">No notes match "{filter}".</p>}
         </div>
         {dupes.length > 0 && (
-          <div className="dupesSummary">⚠ {dupes.length} duplicate group(s) across notes</div>
+          <button
+            type="button"
+            className="dupesSummary"
+            title="View duplicate groups"
+            onClick={() => setDupesOpen(true)}
+          >
+            ⚠ {dupes.length} duplicate group(s) across notes
+          </button>
         )}
       </aside>
 
@@ -733,6 +742,14 @@ export function App() {
             setCategories(c);
             setDomains(d);
           }}
+        />
+      )}
+
+      {dupesOpen && (
+        <DupesDialog
+          groups={dupes}
+          onClose={() => setDupesOpen(false)}
+          onSelect={selectNote}
         />
       )}
     </div>
