@@ -10,10 +10,10 @@ import { ImageBlock } from "./ImageBlock.tsx";
 import { LinkBlock } from "./LinkBlock.tsx";
 import { PreBlock } from "./PreBlock.tsx";
 
-function render(node: BlockNode, path: string) {
+function render(node: BlockNode, path: string, depth: number) {
   switch (node.type) {
     case "outline":
-      return <OutlineNode node={node} path={path} />;
+      return <OutlineNode node={node} path={path} depth={depth} />;
     case "code":
       return <CodeBlock node={node} />;
     case "callout":
@@ -31,9 +31,6 @@ function render(node: BlockNode, path: string) {
     case "link":
       return <LinkBlock node={node} />;
     default:
-      // An unknown type means this build predates a node type used by the note
-      // (e.g. opened with stale build output). Degrade to a visible placeholder
-      // instead of crashing the whole note — never throw on unknown content.
       return (
         <p style={{ opacity: 0.6, fontStyle: "italic" }}>
           [unsupported block: {(node as { type?: string }).type ?? "unknown"}]
@@ -44,6 +41,6 @@ function render(node: BlockNode, path: string) {
 
 // Maps a block node to its renderer. `path` is the node's position in the tree (e.g. "1.2");
 // the wrapper carries `id="n1.2"` so search results can deep-link to (and flash) the node.
-export function BlockRenderer({ node, path }: { node: BlockNode; path: string }) {
-  return <div id={nodeAnchorId(path)}>{render(node, path)}</div>;
+export function BlockRenderer({ node, path, depth = 0 }: { node: BlockNode; path: string; depth?: number }) {
+  return <div id={nodeAnchorId(path)}>{render(node, path, depth)}</div>;
 }

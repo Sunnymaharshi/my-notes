@@ -30,7 +30,6 @@ export function CategoryPage() {
             {n.title}
             {n.draft && <span className={styles.draftTag}>draft</span>}
           </div>
-          {n.summary && <div className={styles.rowSummary}>{n.summary}</div>}
           {n.labels.length > 0 && (
             <div className={styles.rowLabels}>
               {n.labels.map((l) => (

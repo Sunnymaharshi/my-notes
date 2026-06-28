@@ -4,7 +4,7 @@ import { BlockRenderer } from "./BlockRenderer.tsx";
 import { useTree } from "./context.ts";
 import styles from "./blocks.module.css";
 
-export function OutlineNode({ node, path }: { node: OutlineNodeType; path: string }) {
+export function OutlineNode({ node, path, depth = 0 }: { node: OutlineNodeType; path: string; depth?: number }) {
   const { isOpen, toggle } = useTree();
   const children = node.children ?? [];
   const hasChildren = children.length > 0;
@@ -12,7 +12,6 @@ export function OutlineNode({ node, path }: { node: OutlineNodeType; path: strin
   if (!hasChildren) {
     return (
       <div className={styles.leaf}>
-        <span className={styles.bullet} />
         <span>
           {node.text}
           {node.note && <em className={styles.note}> — {node.note}</em>}
@@ -22,22 +21,24 @@ export function OutlineNode({ node, path }: { node: OutlineNodeType; path: strin
   }
 
   const open = isOpen(path);
+  const clampedDepth = Math.min(depth, 2);
 
   return (
     <div className={styles.branch}>
       <button
         className={styles.branchHeader}
+        data-depth={clampedDepth}
         onClick={() => toggle(path)}
         aria-expanded={open}
       >
+        <span>{node.text}</span>
         <motion.span
           className={styles.caret}
           animate={{ rotate: open ? 90 : 0 }}
           transition={{ duration: 0.15 }}
         >
-          ▸
+          ›
         </motion.span>
-        <span>{node.text}</span>
       </button>
 
       <AnimatePresence initial={false}>
@@ -51,7 +52,7 @@ export function OutlineNode({ node, path }: { node: OutlineNodeType; path: strin
             style={{ overflow: "hidden" }}
           >
             {children.map((child, i) => (
-              <BlockRenderer key={i} node={child} path={`${path}.${i}`} />
+              <BlockRenderer key={i} node={child} path={`${path}.${i}`} depth={depth + 1} />
             ))}
           </motion.div>
         )}

@@ -1,10 +1,12 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useContent } from "../lib/useContent.ts";
+import { useLayoutContext } from "../components/Layout.tsx";
 import styles from "./pages.module.css";
 
 export function HomePage() {
   const { index, categories, domains, loading, error } = useContent();
+  const { openPalette } = useLayoutContext();
 
   const counts = useMemo(() => {
     const c = new Map<string, number>();
@@ -46,18 +48,20 @@ export function HomePage() {
   return (
     <div>
       <header className={styles.heroBlock}>
-        <span className={styles.heroEyebrow}>Field manual</span>
-        <h1 className={styles.hero}>
-          A working memory for the things worth keeping close.
-        </h1>
         <p className={styles.heroSub}>
           <strong>{index.length}</strong> note{index.length === 1 ? "" : "s"} ·{" "}
           <strong>{catCount}</strong> categor{catCount === 1 ? "y" : "ies"} ·{" "}
           <strong>{labels.length}</strong> label{labels.length === 1 ? "" : "s"}
-          <span className={styles.heroHint}>
-            <kbd>⌘K</kbd> to search
-          </span>
         </p>
+        <span className={styles.heroEyebrow}>Field manual</span>
+        <h1 className={styles.hero}>
+          A working memory for the things worth keeping close.
+        </h1>
+        <button className={styles.heroSearch} onClick={openPalette} aria-label="Open search">
+          <span className={styles.heroSearchIcon}>⌕</span>
+          <span className={styles.heroSearchPlaceholder}>Search notes…</span>
+          <kbd className={styles.heroSearchKbd}>⌘K</kbd>
+        </button>
       </header>
 
       {domainGroups.map((g) => (
@@ -92,7 +96,6 @@ export function HomePage() {
                 style={{ ["--w" as string]: 0.5 + (count / maxCount) * 0.5 }}
               >
                 {label}
-                <span className={styles.cloudCount}>{count}</span>
               </Link>
             ))}
           </div>

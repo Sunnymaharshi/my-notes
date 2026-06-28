@@ -41,6 +41,24 @@
   overflow: hidden;
 }
 
+@media (max-width: 640px) {
+  .dialog {
+    /* Pin near the top in px so the virtual keyboard opening downward doesn't
+       shift the dialog — vh recalculates on keyboard show/hide, px does not. */
+    top: 60px;
+  }
+
+  .command {
+    /* dvh = dynamic viewport height (shrinks with keyboard); subtract the
+       fixed top offset + a small bottom gap so results never overflow. */
+    max-height: calc(100dvh - 80px);
+  }
+
+  .footer {
+    display: none;
+  }
+}
+
 .inputRow {
   display: flex;
   align-items: center;
@@ -50,8 +68,10 @@
 }
 
 .inputIcon {
-  color: var(--text-faint);
-  font-size: 18px;
+  color: var(--text-dim);
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .input {
@@ -61,8 +81,19 @@
   color: var(--text);
   font-family: var(--font-sans);
   font-size: var(--step-1);
-  padding: 16px 0;
+  padding: 18px 0;
   outline: none;
+  box-shadow: none;
+}
+
+/* Strip cmdk's own focus ring — it targets [cmdk-input] at attribute specificity */
+.input:focus,
+.input:focus-visible,
+:global([cmdk-input]):focus,
+:global([cmdk-input]):focus-visible {
+  outline: none;
+  box-shadow: none;
+  border: none;
 }
 
 .input::placeholder {

@@ -69,7 +69,7 @@ export function NoteView({ note }: { note: Note }) {
     <NoteContext.Provider value={{ noteId: note.id }}>
       <div className={`${styles.layout} ${showSpine ? "" : styles.noSpine}`}>
       <article className={styles.note}>
-        <header className={styles.header}>
+        <header className={`${styles.header} ${hash ? styles.headerCompact : ""}`}>
           <div className={styles.crumbs}>
             <Link to="/" className={styles.crumb}>
               Home
@@ -93,16 +93,24 @@ export function NoteView({ note }: { note: Note }) {
               </button>
             </Tooltip>
           </h1>
-          {note.summary && <p className={styles.summary}>{note.summary}</p>}
-          <div className={styles.meta}>
-            {note.difficulty && <span className={styles.diff}>{note.difficulty}</span>}
-            {note.labels.map((l) => (
-              <Link key={l} to={`/label/${encodeURIComponent(l)}`} className={styles.label}>
-                {l}
-              </Link>
-            ))}
-            {note.updated && <span className={styles.updated}>Updated {note.updated}</span>}
-          </div>
+          {!hash && (
+            <>
+              {note.summary && <p className={styles.summary}>{note.summary}</p>}
+              <div className={styles.meta}>
+                {note.difficulty && (
+                  <span className={`${styles.diff} ${styles[`diff_${note.difficulty}`] ?? ""}`}>
+                    {note.difficulty}
+                  </span>
+                )}
+                {note.labels.map((l) => (
+                  <Link key={l} to={`/label/${encodeURIComponent(l)}`} className={styles.label}>
+                    {l}
+                  </Link>
+                ))}
+                {note.updated && <span className={styles.updated}>Updated {note.updated}</span>}
+              </div>
+            </>
+          )}
         </header>
 
         {!subtopicPath && (

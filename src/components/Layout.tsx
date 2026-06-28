@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, NavLink, Outlet, useLocation, useOutletContext } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useContent } from "../lib/useContent.ts";
 import { useTheme } from "../lib/useTheme.ts";
@@ -14,6 +14,9 @@ const isTypingTarget = (el: EventTarget | null) =>
   el instanceof HTMLElement &&
   (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
 
+type LayoutContext = { openPalette: () => void };
+export const useLayoutContext = () => useOutletContext<LayoutContext>();
+
 export function Layout() {
   const { index, categories, domains } = useContent();
   const { theme, toggle } = useTheme();
@@ -21,6 +24,15 @@ export function Layout() {
   const bookmarkIds = useBookmarks();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const mainRef = useRef<HTMLElement>(null);
+
+  const handleMainScroll = () => {
+    const el = mainRef.current;
+    if (!el) return;
+    const max = el.scrollHeight - el.clientHeight;
+    setScrollProgress(max > 0 ? el.scrollTop / max : 0);
+  };
   const { pathname } = useLocation();
 
   // Close the mobile drawer whenever the route changes.
@@ -113,20 +125,18 @@ export function Layout() {
             </span>
           </Link>
           <div className={styles.toggles}>
-            <Tooltip
-              label={density === "compact" ? "Comfortable spacing" : "Compact spacing"}
-            >
+            <Tooltip label={density === "compact" ? "Comfortable spacing" : "Compact spacing"}>
               <button
                 className={styles.themeToggle}
                 onClick={toggleDensity}
                 aria-label="Toggle density"
                 aria-pressed={density === "compact"}
               >
-                {density === "compact" ? "≣" : "☰"}
+                {density === "compact" ? "⊟" : "⊞"}
               </button>
             </Tooltip>
             <Tooltip label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}>
-              <button className={styles.themeToggle} onClick={toggle} aria-label="Toggle theme">
+              <button className={`${styles.themeToggle} ${styles.themeToggleDesktop}`} onClick={toggle} aria-label="Toggle theme">
                 {theme === "dark" ? "☀" : "☾"}
               </button>
             </Tooltip>
@@ -180,16 +190,33 @@ export function Layout() {
           ))}
         </nav>
       </aside>
-      <main className={styles.main}>
+      <Tooltip label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}>
+        <button className={styles.themeToggleMobile} onClick={toggle} aria-label="Toggle theme">
+          {theme === "dark" ? "☀" : "☾"}
+        </button>
+      </Tooltip>
+      <main className={styles.main} ref={mainRef} onScroll={handleMainScroll}>
         <motion.div
           key={pathname}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
         >
-          <Outlet />
+          <Outlet context={{ openPalette: () => setPaletteOpen(true) }} />
         </motion.div>
       </main>
+      <div
+        className={styles.progressBar}
+        style={{ transform: `scaleX(${scrollProgress})` }}
+        aria-hidden="true"
+      />
+      <button
+        className={styles.searchFab}
+        onClick={() => setPaletteOpen(true)}
+        aria-label="Search notes"
+      >
+        ⌕
+      </button>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   );

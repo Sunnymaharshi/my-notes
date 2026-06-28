@@ -136,7 +136,7 @@ export function CommandPalette({ open, onOpenChange }: Props) {
           className={styles.input}
           value={query}
           onValueChange={setQuery}
-          placeholder="Search notes…  keyword, label, or code symbol"
+          placeholder="Search notes…"
           autoFocus
         />
         {searching && <span className={styles.spinner} aria-hidden="true" />}

@@ -121,7 +121,7 @@ export const miniSearchConfig: MiniSearchOptions = {
  *  `combineWith` is set per-query by `runSearch` (AND first, OR fallback). */
 export const searchQueryOptions = {
   prefix: true,
-  fuzzy: 0.2,
+  fuzzy: 0.35,
   boost: { title: 6, summary: 4, labelsText: 3, category: 2, content: 1.5, code: 0.6 },
 };
 
