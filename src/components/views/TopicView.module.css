@@ -32,6 +32,13 @@
   color: var(--border);
 }
 
+.ancestor {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+
 .heading {
   margin: 0 0 10px;
   font-size: 22px;
@@ -40,6 +47,35 @@
 
 .body {
   font-size: 15px;
+}
+
+.focusedTopic {
+  margin: var(--sp-3) 0;
+}
+
+.sibling {
+  opacity: 0.72;
+  transition: opacity var(--dur-1);
+}
+
+.sibling:hover {
+  opacity: 1;
+}
+
+.expandBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  margin: 4px 0;
+  transition: color var(--dur-1);
+  display: block;
+}
+
+.expandBtn:hover {
+  color: var(--hl);
 }
 
 .missing {

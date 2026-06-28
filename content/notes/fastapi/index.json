@@ -587,8 +587,7 @@
               "type": "outline",
               "text": "FastAPI builds a dependency graph and resolves everything before the route; two routes that Depends(get_db) each get their own session per request"
             }
-          ],
-          "role": "topic"
+          ]
         }
       ],
       "role": "topic"

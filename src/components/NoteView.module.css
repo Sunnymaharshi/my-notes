@@ -250,45 +250,54 @@
 
 /* --- prev/next note pager (within category) --- */
 .pager {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--sp-3);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-4);
   margin-top: var(--sp-6);
-  padding-top: var(--sp-5);
+  padding-top: var(--sp-4);
   border-top: 1px solid var(--border);
 }
 
 .pagerLink {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-1);
-  padding: var(--sp-3) var(--sp-4);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  background: var(--bg-elev);
+  gap: 2px;
   text-decoration: none;
-  color: var(--text);
-  transition: border-color var(--dur-1), transform var(--dur-2) var(--ease), box-shadow var(--dur-2);
+  color: var(--text-dim);
+  transition: color var(--dur-1);
+  max-width: 42%;
 }
 
 .pagerNext {
   text-align: right;
+  margin-left: auto;
 }
 
 .pagerLink:hover {
-  border-color: var(--hl-line);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-1);
+  color: var(--text);
+}
+
+.pagerLink:hover .pagerTitle {
+  color: var(--accent);
 }
 
 .pagerDir {
   font-family: var(--font-mono);
-  font-size: var(--step--1);
-  color: var(--text-dim);
+  font-size: 11px;
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .pagerTitle {
-  font-weight: 600;
+  font-size: var(--step--1);
+  font-weight: 500;
+  color: var(--text-dim);
+  transition: color var(--dur-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .controls {

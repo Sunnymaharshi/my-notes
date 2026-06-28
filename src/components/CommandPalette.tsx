@@ -40,8 +40,8 @@ function highlight(text: string, terms: string[]): React.ReactNode {
     .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
     .sort((a, b) => b.length - a.length);
   if (escaped.length === 0) return text;
-  const splitRe = new RegExp(`(${escaped.join("|")})`, "gi");
-  const isMatch = new RegExp(`^(?:${escaped.join("|")})$`, "i");
+  const splitRe = new RegExp("(" + escaped.join("|") + ")", "gi");
+  const isMatch = new RegExp("^(?:" + escaped.join("|") + ")$", "i");
   return text.split(splitRe).map((p, i) =>
     p && isMatch.test(p) ? (
       <mark key={i} className={styles.mark}>
@@ -54,9 +54,9 @@ function highlight(text: string, terms: string[]): React.ReactNode {
 }
 
 /**
- * Cmd-K / "/" command palette (PLAN §4). Type-ahead search over the prebuilt
- * MiniSearch index; results deep-link to the matched subtopic and bold the
- * matched terms. With no query it offers recent searches, then all notes.
+ * Cmd-K / "/" command palette. Type-ahead search over the prebuilt MiniSearch
+ * index; results deep-link to the matched subtopic and highlight matched terms.
+ * With no query it offers recent searches, then all notes.
  */
 export function CommandPalette({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
@@ -65,16 +65,26 @@ export function CommandPalette({ open, onOpenChange }: Props) {
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [searching, setSearching] = useState(false);
   const [recents, setRecents] = useState<string[]>([]);
+  const [sort, setSort] = useState<"relevance" | "recent">("relevance");
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
-  // Reset the query (and refresh recents) each time the palette opens.
+  // Reset state each time the palette opens/closes.
   useEffect(() => {
     if (open) {
       setQuery("");
       setRecents(loadRecents());
+    } else {
+      setSort("relevance");
+      setActiveCategory(null);
     }
   }, [open]);
 
-  // Run the search whenever the (trimmed) query changes; ignore stale responses.
+  // Reset category filter when query changes (new search = fresh context).
+  useEffect(() => {
+    setActiveCategory(null);
+  }, [query]);
+
+  // Run search; ignore stale responses.
   useEffect(() => {
     const q = query.trim();
     if (!q) {
@@ -99,6 +109,34 @@ export function CommandPalette({ open, onOpenChange }: Props) {
   );
 
   const terms = useMemo(() => query.trim().toLowerCase().split(/\s+/).filter(Boolean), [query]);
+
+  const updatedMap = useMemo(
+    () => new Map(allNotes.map((n) => [n.id, n.updated])),
+    [allNotes],
+  );
+
+  // Sorted hits (relevance or recent).
+  const sortedHits = useMemo(() => {
+    if (sort === "relevance") return hits;
+    return [...hits].sort((a, b) => {
+      const da = updatedMap.get(a.id) ?? "";
+      const db = updatedMap.get(b.id) ?? "";
+      return db.localeCompare(da);
+    });
+  }, [hits, sort, updatedMap]);
+
+  // Categories present in the current result set (only show filter when >1 category).
+  const resultCategories = useMemo(() => {
+    const seen = new Set<string>();
+    for (const h of sortedHits) seen.add(h.category);
+    return Array.from(seen);
+  }, [sortedHits]);
+
+  // Final hits after optional category filter.
+  const visibleHits = useMemo(() => {
+    if (!activeCategory) return sortedHits;
+    return sortedHits.filter((h) => h.category === activeCategory);
+  }, [sortedHits, activeCategory]);
 
   const go = (to: string) => {
     const q = query.trim();
@@ -141,18 +179,60 @@ export function CommandPalette({ open, onOpenChange }: Props) {
         />
         {searching && <span className={styles.spinner} aria-hidden="true" />}
       </div>
+
+      {showHits && hits.length > 0 && (
+        <div className={styles.controls}>
+          {/* Sort toggle */}
+          <div className={styles.sortRow} role="group" aria-label="Sort results">
+            <button
+              className={styles.sortBtn + (sort === "relevance" ? " " + styles.sortActive : "")}
+              onClick={() => setSort("relevance")}
+              type="button"
+              aria-pressed={sort === "relevance"}
+            >
+              Relevance
+            </button>
+            <button
+              className={styles.sortBtn + (sort === "recent" ? " " + styles.sortActive : "")}
+              onClick={() => setSort("recent")}
+              type="button"
+              aria-pressed={sort === "recent"}
+            >
+              Recent
+            </button>
+          </div>
+
+          {/* Category filter — only when results span more than one category */}
+          {resultCategories.length > 1 && (
+            <div className={styles.catFilterRow} role="group" aria-label="Filter by category">
+              {resultCategories.map((cat) => (
+                <button
+                  key={cat}
+                  className={styles.catFilter + (activeCategory === cat ? " " + styles.catFilterActive : "")}
+                  onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}
+                  type="button"
+                  aria-pressed={activeCategory === cat}
+                >
+                  {categoryLabel(categories, cat)}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <Command.List className={styles.list}>
         {showHits ? (
           <>
             {!searching && (
               <Command.Empty className={styles.empty}>
-                No matches for “{query.trim()}”.
+                No matches for &ldquo;{query.trim()}&rdquo;.
               </Command.Empty>
             )}
-            {hits.map((h) => (
+            {visibleHits.map((h) => (
               <Command.Item
-                key={`${h.id}#${h.nodeId ?? ""}`}
-                value={`${h.id}#${h.nodeId ?? ""}`}
+                key={h.id + "#" + (h.nodeId ?? "")}
+                value={h.id + "#" + (h.nodeId ?? "")}
                 onSelect={() => go(noteLink(h, h.nodeId))}
                 className={styles.item}
               >
@@ -189,8 +269,8 @@ export function CommandPalette({ open, onOpenChange }: Props) {
               >
                 {recents.map((r) => (
                   <Command.Item
-                    key={`recent:${r}`}
-                    value={`recent:${r}`}
+                    key={"recent:" + r}
+                    value={"recent:" + r}
                     onSelect={() => setQuery(r)}
                     className={styles.recentItem}
                   >

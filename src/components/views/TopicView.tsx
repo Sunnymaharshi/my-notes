@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import type { Note } from "../../lib/schema.ts";
+import type { BlockNode, Note } from "../../lib/schema.ts";
 import { resolveTopic } from "../../lib/tree.ts";
 import { nodeAnchorId } from "../../lib/search.ts";
 import { BlockRenderer } from "../blocks/BlockRenderer.tsx";
@@ -17,13 +17,24 @@ interface Props {
 }
 
 /**
- * Focused view shown when a search hit deep-links into a note. Resolves the matched
- * path UP to its nearest enclosing topic and renders just that topic (fully expanded),
- * flashing the exact line that matched. The ancestor-topic trail lets the reader widen
- * ("go up") to a broader topic or the full note.
+ * Always expand at the root (body) level so ↑/↓ steps through the note's
+ * top-level topics regardless of how deep the resolved topic sits.
  */
+function getSiblingContext(body: BlockNode[], topicPath: string) {
+  const rootIdx = Number(topicPath.split(".")[0]);
+  return { siblings: body, currentIdx: rootIdx, siblingPath: "" };
+}
+
 export function TopicView({ note, path }: Props) {
   const resolved = useMemo(() => resolveTopic(note.body, path), [note, path]);
+  const [extraAbove, setExtraAbove] = useState(0);
+  const [extraBelow, setExtraBelow] = useState(0);
+
+  // Reset expansion state when the path changes (new deep-link).
+  useEffect(() => {
+    setExtraAbove(0);
+    setExtraBelow(0);
+  }, [path]);
 
   // Flash the exact matched node inside the shown topic (it's already expanded).
   useEffect(() => {
@@ -43,7 +54,12 @@ export function TopicView({ note, path }: Props) {
     return () => window.clearTimeout(timer);
   }, [resolved, path]);
 
-  if (!resolved) {
+  const siblingCtx = useMemo(
+    () => (resolved ? getSiblingContext(note.body, resolved.path) : null),
+    [note.body, resolved],
+  );
+
+  if (!resolved || !siblingCtx) {
     return (
       <div className={styles.missing}>
         <p>Topic not found.</p>
@@ -57,40 +73,77 @@ export function TopicView({ note, path }: Props) {
   const { node, path: topicPath, trail } = resolved;
   const heading = node.type === "outline" ? node.text : "Topic";
   const noteBase = `/${note.category}/${note.id}`;
-  // Render the topic's children (the heading is shown separately as <h2>); if the
-  // resolved node isn't an outline (rare), render the node itself.
   const children = node.type === "outline" ? (node.children ?? []) : null;
+
+  const { siblings, currentIdx, siblingPath } = siblingCtx;
+  const sibPrefix = siblingPath ? `${siblingPath}.` : "";
+
+  const aboveStart = Math.max(0, currentIdx - extraAbove);
+  const canExpandAbove = aboveStart > 0;
+  const canExpandBelow = currentIdx + extraBelow + 1 < siblings.length;
+
+  const aboveNodes = siblings.slice(aboveStart, currentIdx);
+  const belowNodes = siblings.slice(currentIdx + 1, currentIdx + 1 + extraBelow);
 
   return (
     <div className={styles.topic}>
-      {/* "Go up": the full note, then each broader ancestor topic. */}
       <div className={styles.upbar}>
         <Link to={noteBase} className={styles.up}>
           ↑ Full note
         </Link>
-        {trail.map((c) => (
-          <span key={c.path} className={styles.upStep}>
-            <span className={styles.sep}>›</span>
-            <Link to={`${noteBase}#${nodeAnchorId(c.path)}`} className={styles.up}>
-              {c.text}
-            </Link>
-          </span>
-        ))}
       </div>
 
-      {/* id so a search that matches the topic heading itself can be flashed */}
-      <h2 className={styles.heading} id={nodeAnchorId(topicPath)}>
-        {heading}
-      </h2>
-
       <TreeContext.Provider value={openTree}>
-        <div className={styles.body}>
-          {children
-            ? children.map((child, i) => (
-                <BlockRenderer key={i} node={child} path={`${topicPath}.${i}`} />
-              ))
-            : <BlockRenderer node={node} path={topicPath} />}
+        {/* Expand above */}
+        {canExpandAbove && (
+          <button className={styles.expandBtn} onClick={() => setExtraAbove((n) => n + 1)}>
+            ↑ Expand
+          </button>
+        )}
+
+        {/* Siblings rendered above the focused topic */}
+        {aboveNodes.map((sibling, i) => {
+          const sibPath = `${sibPrefix}${aboveStart + i}`;
+          return (
+            <div key={sibPath} className={styles.sibling}>
+              <BlockRenderer node={sibling} path={sibPath} />
+            </div>
+          );
+        })}
+
+        {/* Divider marking the focused topic */}
+        <div className={styles.focusedTopic}>
+          {trail.map((c) => (
+            <div key={c.path} className={styles.ancestor}>{c.text}</div>
+          ))}
+          <h2 className={styles.heading} id={nodeAnchorId(topicPath)}>
+            {heading}
+          </h2>
+          <div className={styles.body}>
+            {children
+              ? children.map((child, i) => (
+                  <BlockRenderer key={i} node={child} path={`${topicPath}.${i}`} />
+                ))
+              : <BlockRenderer node={node} path={topicPath} />}
+          </div>
         </div>
+
+        {/* Siblings rendered below the focused topic */}
+        {belowNodes.map((sibling, i) => {
+          const sibPath = `${sibPrefix}${currentIdx + 1 + i}`;
+          return (
+            <div key={sibPath} className={styles.sibling}>
+              <BlockRenderer node={sibling} path={sibPath} />
+            </div>
+          );
+        })}
+
+        {/* Expand below */}
+        {canExpandBelow && (
+          <button className={styles.expandBtn} onClick={() => setExtraBelow((n) => n + 1)}>
+            ↓ Expand
+          </button>
+        )}
       </TreeContext.Provider>
     </div>
   );
