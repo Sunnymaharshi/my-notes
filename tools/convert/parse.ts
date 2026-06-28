@@ -2,8 +2,10 @@
  * Deterministic notes-file -> skeleton note JSON parser.
  *
  * Input: a notes file (.py / .js / .txt / ...) written as an indented outline, with code
- * wrapped in ``` fences (optionally ```lang). The container's comment delimiters
- * (""" ... """, ''' ... ''', /* ... *\/) are stripped automatically.
+ * wrapped in ``` fences (optionally ```lang). Fences may carry a leading line-comment marker
+ * on either end (`# ```, `// ```, `-- ```, `* ```) so they read as natural comments in the host
+ * language — the marker is stripped, including on the closing fence. The container's block-comment
+ * delimiters (""" ... """, ''' ... ''', /* ... *\/) are stripped automatically too.
  *
  * Output: a schema-valid skeleton note. Structure is faithful and lossless — indentation
  * becomes the outline tree, fenced blocks become `code` nodes. The envelope is stubbed and
@@ -143,8 +145,13 @@ export function cleanRawLines(text: string): string[] {
       // Code region between two ``` markers: first line is the info string (lang[:filename]).
       blankRun = 0;
       const lines = part.split("\n");
+      // The closing fence may carry a leading comment marker (`# ```, `// ```, `* ```), so the
+      // text on the line before the closing ``` is a comment-only fragment, not code. Drop a
+      // trailing comment-marker-only line so the marker doesn't leak into the code body.
+      let endLine = lines.length;
+      if (endLine > 1 && /^\s*(?:#+|\/\/+|--+|\*)\s*$/.test(lines[endLine - 1])) endLine--;
       out.push(`${fenceIndent}\`\`\`${lines[0].trim()}`);
-      for (let k = 1; k < lines.length; k++) out.push(lines[k]);
+      for (let k = 1; k < endLine; k++) out.push(lines[k]);
       out.push(`${fenceIndent}\`\`\``);
       fenceIndent = "";
     }
