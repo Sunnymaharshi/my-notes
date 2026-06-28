@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "id": "resource-management",
+  "title": "Resource Management",
+  "category": "python",
+  "labels": [
+    "python"
+  ],
+  "summary": "An overview of resource management in Python using context managers, the with statement lifecycle, and the contextlib standard library.",
+  "difficulty": "intermediate",
+  "updated": "2026-06-28",
+  "draft": false,
+  "body": [
+    {
+      "type": "outline",
+      "text": "Context manager",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "guaranteed setup and teardown logic"
+        },
+        {
+          "type": "outline",
+          "text": "object that defines __enter__ and __exit__."
+        },
+        {
+          "type": "outline",
+          "text": "Python's with is syntactic sugar for try/finally."
+        },
+        {
+          "type": "outline",
+          "text": "The with statement calls enter before the code block and exit after, even if an exception is thrown."
+        },
+        {
+          "type": "outline",
+          "text": "This is how DB connections guarantee they're closed"
+        },
+        {
+          "type": "outline",
+          "text": "how FastAPI dependencies clean up after a request."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "with open(\"README.md\", \"r\") as f:\n    # print(f.read())\n    pass\n# closes the file connection after exiting the with block\n\n\n# Manual try/finally (what \"with\" replaces)\nconn = get_connection()\ntry:\n    result = conn.execute(query)\nfinally:\n    conn.close()  # Always runs\n\n# Context manager cleaner, same guarantee\nwith get_connection() as conn:\n    result = conn.execute(query)\n# conn.close() called automatically"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "# custom context manager\nclass DBConnection:\n    def __init__(self):\n        self.connection = None\n\n    def __enter__(self):\n        self.connection = None  # connection variable\n        print(\"creating connection\")\n        return self.connection\n\n    # exception type, value and traceback\n    def __exit__(self, exc_type, exc_val, exc_tb):\n        # commit and close the connection\n        print(\"commited and closed connection\")\n\n\nwith DBConnection() as connection:\n   print(\"working with DB connection\")\n\n\noutput:\ncreating connection\nworking with DB connection\ncommited and closed connection"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "contextlib",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "@contextmanager",
+          "children": [
+            {
+              "type": "outline",
+              "text": "write a context manager as a generator instead of a full class"
+            },
+            {
+              "type": "outline",
+              "text": "The code before the yield statement acts as __enter__"
+            },
+            {
+              "type": "outline",
+              "text": "and the code after the yield acts as __exit__"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "suppress",
+          "children": [
+            {
+              "type": "outline",
+              "text": "silently ignore specific exceptions instead of try/except/pass"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "ExitStack",
+          "children": [
+            {
+              "type": "outline",
+              "text": "dynamically compose multiple context managers"
+            },
+            {
+              "type": "outline",
+              "text": "useful when you don't know how many resources to open"
+            }
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "from contextlib import contextmanager, suppress\n\n\n@contextmanager\ndef db_connection(url):\n    conn = {\"status\": \"connected\", \"url\": url}\n    try:\n        yield conn\n    except Exception as e:\n        print(f\"Handling error: {e}\")\n        raise\n    finally:\n        conn[\"status\"] = \"disconnected\"\n        pass              # disconnect / cleanup\n\nwith db_connection(\"postgres://...\") as conn:\n    pass\n\nwith suppress(FileNotFoundError):\n    open(\"missing.txt\")   # no try/except/pass boilerplate needed\n\nfiles = [\"a.txt\", \"b.txt\"]\nwith ExitStack() as stack:\n    handles = [stack.enter_context(open(f)) for f in files]\n    # all files closed automatically when block exits"
+        }
+      ]
+    }
+  ]
+}

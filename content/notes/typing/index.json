@@ -1,0 +1,232 @@
+{
+  "schemaVersion": 1,
+  "id": "typing",
+  "title": "Typing",
+  "category": "python",
+  "labels": [
+    "python",
+    "pydantic",
+    "fastapi"
+  ],
+  "summary": "A deep dive into Python's type hinting system, covering static type annotations, modern syntax updates, generics with TypeVar, and runtime optimization techniques like TYPE_CHECKING.",
+  "difficulty": "intermediate",
+  "updated": "2026-06-28",
+  "draft": false,
+  "body": [
+    {
+      "type": "outline",
+      "text": "Typing in python",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "only useful in development"
+        },
+        {
+          "type": "outline",
+          "text": "code editor checks these for errors while development"
+        },
+        {
+          "type": "outline",
+          "text": "no uses in runtime"
+        },
+        {
+          "type": "outline",
+          "text": "types can be imported from typing",
+          "children": [
+            {
+              "type": "outline",
+              "text": "ex: from typing import List,Dict,Union"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "adding type for a parameter and return",
+          "children": [
+            {
+              "type": "code",
+              "lang": "python",
+              "code": "ex: def add(a:int,b:int) -> int:\n    pass"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Union",
+          "children": [
+            {
+              "type": "outline",
+              "text": "can add all possible types"
+            },
+            {
+              "type": "outline",
+              "text": "ex: Union[str, int]"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Optional",
+          "children": [
+            {
+              "type": "outline",
+              "text": "shorthand for Union[X, None]"
+            },
+            {
+              "type": "outline",
+              "text": "ex: Optional[str] == Union[str, None]"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Modern syntax (Python 3.10+)",
+          "children": [
+            {
+              "type": "outline",
+              "text": "use | instead of Union"
+            },
+            {
+              "type": "outline",
+              "text": "ex: str | int | None"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "TypeVar and Generic",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "TypeVar",
+          "children": [
+            {
+              "type": "outline",
+              "text": "placeholder for a type — like a template parameter"
+            },
+            {
+              "type": "outline",
+              "text": "constrains that input/output types are linked"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Generic[T]",
+          "children": [
+            {
+              "type": "outline",
+              "text": "makes a class generic — can be parameterized with a type"
+            },
+            {
+              "type": "outline",
+              "text": "T flows through so type checker tracks it end-to-end"
+            }
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "from typing import Generic, TypeVar\n\nT = TypeVar(\"T\")\n\ndef first(items: list[T]) -> T:   # return type linked to input type\n    return items[0]\n\n# first([1, 2, 3])     → int  (type checker knows this)\n# first([\"a\", \"b\"])    → str\n\nclass Stack(Generic[T]):\n    def __init__(self) -> None:\n        self._items: list[T] = []\n    def push(self, item: T) -> None:\n        self._items.append(item)\n    def pop(self) -> T:\n        return self._items.pop()\n\n# s = Stack[int]()\n# s.push(\"x\")  → type error caught by mypy"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Annotations & Type Checking Imports",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "from __future__ import annotations",
+          "children": [
+            {
+              "type": "outline",
+              "text": "stores all annotations as strings instead of evaluating them at runtime"
+            },
+            {
+              "type": "outline",
+              "text": "stops Python from evaluating type hints as real objects when the module loads."
+            },
+            {
+              "type": "outline",
+              "text": "Solves forward references and makes annotation syntax cleaner."
+            },
+            {
+              "type": "outline",
+              "text": "forward reference",
+              "children": [
+                {
+                  "type": "code",
+                  "lang": "python",
+                  "code": "class Node:\n    def next(self) -> Node:  # NameError: Node not defined yet"
+                }
+              ]
+            },
+            {
+              "type": "outline",
+              "text": "Normally you'd write -> \"Node\" as a string to defer it."
+            },
+            {
+              "type": "outline",
+              "text": "With the import, all annotations become strings automatically."
+            },
+            {
+              "type": "outline",
+              "text": "__annotations__ returns raw strings, not types"
+            },
+            {
+              "type": "outline",
+              "text": "get_type_hints()",
+              "children": [
+                {
+                  "type": "outline",
+                  "text": "resolves them when you actually need them."
+                },
+                {
+                  "type": "outline",
+                  "text": "ex: typing.get_type_hints(obj)"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "TYPE_CHECKING guard",
+          "children": [
+            {
+              "type": "outline",
+              "text": "a bool that is False at runtime, True during static analysis (mypy/pyright)"
+            },
+            {
+              "type": "outline",
+              "text": "solves circular imports — the import block never executes at runtime"
+            },
+            {
+              "type": "outline",
+              "text": "used when two modules reference each other's types"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "They work together — TYPE_CHECKING removes the import,"
+        },
+        {
+          "type": "outline",
+          "text": "from __future__ keeps the annotation as a string so the missing name doesn't crash"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "from __future__ import annotations\n\nfrom typing import TYPE_CHECKING\n\nif TYPE_CHECKING:\n    from models import User  # never runs at runtime\n\ndef process(user: User) -> None:   # \"User\" is just a string — no NameError\n    ...\n\n# without from __future__: must write user: \"User\" manually\n# without TYPE_CHECKING:   circular import crashes at startup"
+        }
+      ]
+    }
+  ]
+}

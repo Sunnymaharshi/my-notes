@@ -1,0 +1,318 @@
+{
+  "schemaVersion": 1,
+  "id": "functions-decorators",
+  "title": "Functions & Decorators",
+  "category": "python",
+  "labels": [
+    "python",
+    "oop"
+  ],
+  "summary": "A comprehensive guide to advanced Python function concepts, including decorators, class method types, functools utilities, lambda functions, and argument unpacking.",
+  "difficulty": "intermediate",
+  "updated": "2026-06-28",
+  "draft": false,
+  "body": [
+    {
+      "type": "outline",
+      "text": "Decorators",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "adds additional functionality to the functions"
+        },
+        {
+          "type": "outline",
+          "text": "function that takes another function and returns a modified version of it."
+        },
+        {
+          "type": "outline",
+          "text": "decorators run bottom-up, closest one to the function runs first"
+        },
+        {
+          "type": "outline",
+          "text": "Built-in decorators",
+          "children": [
+            {
+              "type": "outline",
+              "text": "@property",
+              "children": [
+                {
+                  "type": "outline",
+                  "text": "make function as a property"
+                },
+                {
+                  "type": "outline",
+                  "text": "only used if function doesn't take any arguments"
+                },
+                {
+                  "type": "outline",
+                  "text": "except self"
+                }
+              ]
+            },
+            {
+              "type": "outline",
+              "text": "@classmethod"
+            },
+            {
+              "type": "outline",
+              "text": "@dataclass"
+            }
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "# Writing your own decorator\nfrom functools import wraps\ndef my_logger(func):\n    @wraps(func) # Keeps original __name__ and __doc__ intact\n    async def wrapper(*args, **kwargs):\n        print(f\"Calling {func.__name__}\")\n        func(*args, **kwargs)\n        print(\"Done\")\n    return wrapper\n@my_logger\ndef say_hello():\n    print(\"Hello, World!\")"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Class Method Types",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "Instance methods",
+          "children": [
+            {
+              "type": "outline",
+              "text": "takes self/object as first parameter"
+            },
+            {
+              "type": "outline",
+              "text": "perform operations that depend on the data of a specific object."
+            },
+            {
+              "type": "outline",
+              "text": "usage: obj.method() or Class.method(obj)"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "@classmethod",
+          "children": [
+            {
+              "type": "outline",
+              "text": "takes cls as first parametr"
+            },
+            {
+              "type": "outline",
+              "text": "bound to the class and not the instance of the class."
+            },
+            {
+              "type": "outline",
+              "text": "callable without instantiating the class"
+            },
+            {
+              "type": "outline",
+              "text": "with class arg u can access it's static props and methods"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "@staticmethod",
+          "children": [
+            {
+              "type": "outline",
+              "text": "defines a function as static method"
+            },
+            {
+              "type": "outline",
+              "text": "acts as just normal function"
+            },
+            {
+              "type": "outline",
+              "text": "callable without instantiating the class"
+            },
+            {
+              "type": "outline",
+              "text": "we don't pass an self/object of the class to it"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "When to use which",
+          "children": [
+            {
+              "type": "outline",
+              "text": "@classmethod",
+              "children": [
+                {
+                  "type": "outline",
+                  "text": "if you need to interact with class-level variables"
+                }
+              ]
+            },
+            {
+              "type": "outline",
+              "text": "@staticmethod",
+              "children": [
+                {
+                  "type": "outline",
+                  "text": "your function is just a generic helper that could live outside the class"
+                },
+                {
+                  "type": "outline",
+                  "text": "but feels better grouped with it"
+                }
+              ]
+            },
+            {
+              "type": "outline",
+              "text": "classmethod preffered than static method"
+            },
+            {
+              "type": "outline",
+              "text": "you can add ur parameters to these as u like"
+            }
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "class ClassTest:\n    static_prop = 1\n\n    def __init__(self):\n        pass\n\n    def instance_method(self):\n        print(f\"instance method of {self}\")\n\n    @classmethod\n    def class_method(cls):\n        print(f\"class method of {cls.__name__}\")\n\n    @staticmethod\n    def static_method():\n        print(\"static method\")\n\n\nClassTest.static_method()\nClassTest.class_method()\n# static method\n# class method of ClassTest"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "functools",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "lru_cache",
+          "children": [
+            {
+              "type": "outline",
+              "text": "memoizes return values, keyed on args"
+            },
+            {
+              "type": "outline",
+              "text": "maxsize=None = unlimited cache (use carefully)"
+            },
+            {
+              "type": "outline",
+              "text": "cache_clear() to invalidate"
+            },
+            {
+              "type": "outline",
+              "text": "functools.cache is modern way"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "partial",
+          "children": [
+            {
+              "type": "outline",
+              "text": "freezes some arguments of a function"
+            },
+            {
+              "type": "outline",
+              "text": "unlike lambda, it has func, args, and keywords attributes."
+            },
+            {
+              "type": "outline",
+              "text": "better debugging"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "wraps",
+          "children": [
+            {
+              "type": "outline",
+              "text": "preserves original function metadata when writing decorators"
+            },
+            {
+              "type": "outline",
+              "text": "without it, func.__name__ and __doc__ become wrapper's"
+            }
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "from functools import lru_cache, partial, wraps\n\n\n@lru_cache(maxsize=128)\ndef fib(n: int) -> int:\n    return n if n < 2 else fib(n-1) + fib(n-2)\n\ndef power(base, exp):\n    return base ** exp\ndouble = partial(pow, exp=2)  # double(3) → 9\n\ndef log_call(func):\n    @wraps(func)  # without this, func.__name__ == \"wrapper\"\n    def wrapper(*args, **kwargs):\n        print(f\"calling {func.__name__}\")\n        return func(*args, **kwargs)\n    return wrapper"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "lambda functions",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "has no name"
+        },
+        {
+          "type": "outline",
+          "text": "only returns single expression"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "add = lambda x, y: x + y\nno_params = lambda: 1\n# print(add(1,2))\n# print(no_params())"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Arguments unpacking",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "Tuple Unpacking (*args)",
+          "children": [
+            {
+              "type": "outline",
+              "text": "for regular arguments"
+            },
+            {
+              "type": "outline",
+              "text": "takes all arguments into args tuple"
+            },
+            {
+              "type": "outline",
+              "text": "spreads them as regular arguments"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Dictionary Unpacking (**kwargs)",
+          "children": [
+            {
+              "type": "outline",
+              "text": "for named arguments"
+            },
+            {
+              "type": "outline",
+              "text": "takes all names arguments into dictionary"
+            },
+            {
+              "type": "outline",
+              "text": "with key as name and value as argument"
+            }
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "def some_args(*args, **kwargs):\n    print(args, kwargs)\n\n# some_args(1,2,3,four=4,five=5)\n# (1, 2, 3) {'four': 4, 'five': 5}"
+        }
+      ]
+    }
+  ]
+}

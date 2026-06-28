@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 1,
+  "id": "iterators-generators",
+  "title": "Iterators & Generators",
+  "category": "python",
+  "labels": [
+    "python"
+  ],
+  "summary": "A deep dive into the protocol differences, relationship, and implementation details of Python iterables, iterators, and generators.",
+  "difficulty": "intermediate",
+  "updated": "2026-06-28",
+  "draft": false,
+  "body": [
+    {
+      "type": "outline",
+      "text": "Iterables, Iterators & Generators",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "Iterable",
+          "children": [
+            {
+              "type": "outline",
+              "text": "any object you can loop over"
+            },
+            {
+              "type": "outline",
+              "text": "must implement __iter__() which returns an iterator"
+            },
+            {
+              "type": "outline",
+              "text": "examples: list, tuple, str, dict, generator objects"
+            },
+            {
+              "type": "outline",
+              "text": "can be iterated multiple times (unlike iterators)"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Iterator",
+          "children": [
+            {
+              "type": "outline",
+              "text": "object that produces values one at a time"
+            },
+            {
+              "type": "outline",
+              "text": "must implement __next__() — raises StopIteration when exhausted"
+            },
+            {
+              "type": "outline",
+              "text": "must also implement __iter__() returning self (so it's also iterable)"
+            },
+            {
+              "type": "outline",
+              "text": "one-directional, single-use — can't reset or rewind"
+            },
+            {
+              "type": "outline",
+              "text": "for loop calls iter() then repeatedly calls next() under the hood"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "Generator",
+          "children": [
+            {
+              "type": "outline",
+              "text": "a simpler way to write an iterator — no class needed"
+            },
+            {
+              "type": "outline",
+              "text": "function body suspends at yield, resumes on next next() call"
+            },
+            {
+              "type": "outline",
+              "text": "return inside a generator raises StopIteration"
+            },
+            {
+              "type": "outline",
+              "text": "lazy — values produced on demand, not stored in memory"
+            },
+            {
+              "type": "outline",
+              "text": "can only be iterated once — exhausted after full traversal"
+            },
+            {
+              "type": "outline",
+              "text": "Generator expression",
+              "children": [
+                {
+                  "type": "outline",
+                  "text": "(x for x in iterable), like list comp but lazy"
+                }
+              ]
+            },
+            {
+              "type": "outline",
+              "text": "send() method transforms a standard generator into a coroutine"
+            },
+            {
+              "type": "outline",
+              "text": "allowing for two-way communication."
+            },
+            {
+              "type": "outline",
+              "text": "Why is next(gen) required first before send()?",
+              "children": [
+                {
+                  "type": "outline",
+                  "text": "You cannot send a non-None value to a newly started generator."
+                },
+                {
+                  "type": "outline",
+                  "text": "if gen.send(10) right out of the gate, Python would throw a TypeError"
+                },
+                {
+                  "type": "outline",
+                  "text": "You have to advance the execution code to the very first yield expression"
+                },
+                {
+                  "type": "outline",
+                  "text": "so that there is a \"waiting receiver\" ready to catch your sent value."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "All generators are iterators."
+        },
+        {
+          "type": "outline",
+          "text": "Not all iterators are generators."
+        },
+        {
+          "type": "outline",
+          "text": "All iterators are iterable (have __iter__)."
+        },
+        {
+          "type": "outline",
+          "text": "Not all iterables are iterators (list has __iter__ but no __next__)."
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "# Generator function \ndef first_n(n):\n    num = 0\n    while num < n:\n        yield num\n        num += 1\n\ngen = first_n(5)\n# next(gen)  → 0\n# next(gen)  → 1\n# list(first_n(5))  → [0, 1, 2, 3, 4]\n\n# Generator expression — lazy list comprehension \nsquares = (x * x for x in range(5))\n# list(squares)  → [0, 1, 4, 9, 16]\n# list(squares)  → []  — already exhausted"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "# send() — pass a value back into a suspended generator \ndef greeter():\n    # 1. Pauses here and yields a status message.\n    # 2. When resumed with .send(), the name goes into `user_name`.\n    user_name = yield \"Ready for input\" \n\n    print(f\"Robot: Hello, {user_name}!\")\n\n# --- Using the generator ---\n\nbot = greeter()\n\n# Step 1: Prime the generator (wake it up and run to the first yield)\nstatus = next(bot)\nprint(f\"Main Code received: {status}\") \n\n# Step 2: Send data into the waiting yield\nbot.send(\"Alice\")\n\noutput:\nMain Code received: Ready for input\nRobot: Hello, Alice!"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Iterator class",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "only __next__ — not iterable (no __iter__)"
+        },
+        {
+          "type": "outline",
+          "text": "can't use directly in a for loop"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "class CountIterator:\n    def __init__(self, n):\n        self.n = n\n        self.current = 0\n\n    def __next__(self):\n        if self.current < self.n:\n            val = self.current\n            self.current += 1\n            return val\n        raise StopIteration\n\n# next(CountIterator(3))  → 0\n# for i in CountIterator(3): ...  → TypeError: object is not iterable"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "Iterable + Iterator class",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "has both __iter__ and __next__ — usable in for loops"
+        },
+        {
+          "type": "outline",
+          "text": "__iter__ returns self — same object is both iterable and iterator"
+        },
+        {
+          "type": "outline",
+          "text": "consequence: single-use — once exhausted, re-looping gives nothing"
+        },
+        {
+          "type": "outline",
+          "text": "to make reusable, __iter__ should return a fresh iterator instead"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "class CountUpTo:\n    def __init__(self, n):\n        self.n = n\n        self.current = 0\n\n    def __iter__(self):\n        return self   # returns self — single use\n\n    def __next__(self):\n        if self.current < self.n:\n            val = self.current\n            self.current += 1\n            return val\n        raise StopIteration\n\n# for i in CountUpTo(3): print(i, end=\" \")  → 0 1 2"
+        }
+      ]
+    }
+  ]
+}

@@ -28,6 +28,11 @@
     "order": 1,
     "noteOrder": [
       "python-classes",
+      "functions-decorators",
+      "iterators-generators",
+      "resource-management",
+      "typing",
+      "collections",
       "fastapi"
     ]
   },

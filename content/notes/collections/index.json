@@ -1,0 +1,301 @@
+{
+  "schemaVersion": 1,
+  "id": "collections",
+  "title": "Collections",
+  "category": "python",
+  "labels": [
+    "python"
+  ],
+  "summary": "An overview of Python's specialized container data types and memory-efficient structures from the collections, heapq, bisect, array, and weakref modules.",
+  "difficulty": "intermediate",
+  "updated": "2026-06-28",
+  "draft": false,
+  "body": [
+    {
+      "type": "outline",
+      "text": "Counter",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "dict with count of each element"
+        },
+        {
+          "type": "outline",
+          "text": "most_common(n) returns top n elements by count"
+        },
+        {
+          "type": "outline",
+          "text": "supports +, -, & (intersection), | (union) between counters"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "defaultdict",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "never raises KeyError — auto-initializes missing keys"
+        },
+        {
+          "type": "outline",
+          "text": "defaultdict(list)  → missing key gets []"
+        },
+        {
+          "type": "outline",
+          "text": "defaultdict(int)   → missing key gets 0"
+        },
+        {
+          "type": "outline",
+          "text": "accessing a missing key CREATES it — don't use for key existence checks"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "OrderedDict",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "predates Python 3.7 — regular dict now maintains insertion order"
+        },
+        {
+          "type": "outline",
+          "text": "still useful for:",
+          "children": [
+            {
+              "type": "outline",
+              "text": "move_to_end(key) — move a key to front or back"
+            },
+            {
+              "type": "outline",
+              "text": "equality check cares about order (regular dicts don't)"
+            },
+            {
+              "type": "outline",
+              "text": "LRU cache implementation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "namedtuple",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "tuple subclass with named fields — immutable"
+        },
+        {
+          "type": "outline",
+          "text": "more memory efficient than a class or dict"
+        },
+        {
+          "type": "outline",
+          "text": "_asdict() converts to dict"
+        },
+        {
+          "type": "outline",
+          "text": "_replace() returns a new instance with changed fields"
+        },
+        {
+          "type": "outline",
+          "text": "prefer dataclass if you need mutability or methods"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "deque",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "O(1) append and pop from both ends (list pop(0) is O(n))"
+        },
+        {
+          "type": "outline",
+          "text": "maxlen parameter — auto-discards oldest when full (sliding window)"
+        },
+        {
+          "type": "outline",
+          "text": "thread-safe for append/pop from opposite ends"
+        },
+        {
+          "type": "outline",
+          "text": "methods: append, appendleft, pop, popleft, rotate(n)"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "from collections import Counter, defaultdict, deque, namedtuple\n\n# Counter\nc = Counter(\"aabbbc\")\n# Counter({'b': 3, 'a': 2, 'c': 1})\n# c.most_common(1)  → [('b', 3)]\n# Counter(\"abc\") + Counter(\"ab\")  → Counter({'a': 2, 'b': 2, 'c': 1})\n\n# defaultdict\ngraph = defaultdict(list)\ngraph[\"a\"].append(\"b\")   # no KeyError even though \"a\" didn't exist\n# gotcha:\n# if \"x\" in graph: ...   # this is fine\n# graph[\"x\"]             # this creates the key — use graph.get(\"x\") instead\n\n# namedtuple\nPoints = namedtuple(\"Points\", [\"x\", \"y\"])\np = Points(1, 2)\n# p.x → 1, p[0] → 1\n# p._asdict()     → {'x': 1, 'y': 2}\n# p._replace(x=5) → Points(x=5, y=2)\n\n# deque with maxlen — sliding window\nrecent = deque(maxlen=3)\nfor i in range(5):\n    recent.append(i)\n# recent → deque([2, 3, 4], maxlen=3)  — oldest auto-dropped\n\n# rotate\nd = deque([1, 2, 3, 4, 5])\nd.rotate(2)   # → deque([4, 5, 1, 2, 3])"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "heapq",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "min-heap on top of a regular list"
+        },
+        {
+          "type": "outline",
+          "text": "heappush / heappop maintain heap invariant"
+        },
+        {
+          "type": "outline",
+          "text": "heapq[0] always the smallest element — O(1) peek"
+        },
+        {
+          "type": "outline",
+          "text": "nlargest(n) / nsmallest(n) — more efficient than sorting for small n"
+        },
+        {
+          "type": "outline",
+          "text": "no max-heap built in — negate values to simulate one"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "import heapq\n\ntasks = []\nheapq.heappush(tasks, (2, \"medium\"))\nheapq.heappush(tasks, (1, \"urgent\"))\nheapq.heappush(tasks, (3, \"low\"))\n# heapq.heappop(tasks)  → (1, \"urgent\")\n\n# max-heap via negation\nheapq.heappush(tasks, (-1, \"highest\"))"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "bisect",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "binary search on a sorted list — O(log n)"
+        },
+        {
+          "type": "outline",
+          "text": "bisect_left(a, x)  → index where x would be inserted (left of duplicates)"
+        },
+        {
+          "type": "outline",
+          "text": "bisect_right(a, x) → index after existing x entries"
+        },
+        {
+          "type": "outline",
+          "text": "insort(a, x)       → inserts x keeping list sorted"
+        },
+        {
+          "type": "outline",
+          "text": "use when you need a sorted list with frequent lookups but few inserts"
+        },
+        {
+          "type": "outline",
+          "text": "for frequent inserts + sorted order, use a sorted container (sortedcontainers lib)"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "import bisect\n\nscores = [10, 20, 30, 40, 50]\nbisect.bisect_left(scores, 35)    # → 3 (where 35 would go)\nbisect.insort(scores, 35)         # → [10, 20, 30, 35, 40, 50]\n\n# grade lookup with bisect\nbreakpoints = [60, 70, 80, 90]\ngrades = \"FDCBA\"\ndef grade(score):\n    return grades[bisect.bisect(breakpoints, score)]\n# grade(85) → 'B'"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "array",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "typed array — all elements must be same C type"
+        },
+        {
+          "type": "outline",
+          "text": "far more memory efficient than list for large numeric data"
+        },
+        {
+          "type": "outline",
+          "text": "not as flexible as numpy but no dependency"
+        },
+        {
+          "type": "outline",
+          "text": "typecodes: 'i' int, 'f' float, 'd' double, 'b' signed char"
+        },
+        {
+          "type": "outline",
+          "text": "prefer numpy for math operations — array has no vectorized ops"
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "from array import array\n\nints = array(\"i\", [1, 2, 3, 4])   # 4 bytes per element vs ~28 for list int\n# ints.append(5)\n# ints[0]  → 1"
+        }
+      ]
+    },
+    {
+      "type": "outline",
+      "text": "weakref",
+      "role": "topic",
+      "children": [
+        {
+          "type": "outline",
+          "text": "normal reference → object stays alive as long as ref exists"
+        },
+        {
+          "type": "outline",
+          "text": "weak reference → doesn't count toward GC reference count",
+          "children": [
+            {
+              "type": "outline",
+              "text": "becomes None when object is collected"
+            }
+          ]
+        },
+        {
+          "type": "outline",
+          "text": "WeakValueDictionary  → values GC'd when no strong refs remain"
+        },
+        {
+          "type": "outline",
+          "text": "WeakKeyDictionary    → keys GC'd when no strong refs remain"
+        },
+        {
+          "type": "outline",
+          "text": "WeakSet              → set whose members can be GC'd"
+        },
+        {
+          "type": "outline",
+          "text": "weakref.ref(obj)     → callable; returns obj or None if collected"
+        },
+        {
+          "type": "outline",
+          "text": "use cases:",
+          "children": [
+            {
+              "type": "outline",
+              "text": "caches — don't prevent GC of cached objects"
+            },
+            {
+              "type": "outline",
+              "text": "observer/event systems — listeners shouldn't keep emitter alive"
+            },
+            {
+              "type": "outline",
+              "text": "circular references — A holds B, B holds A; weakref breaks the cycle"
+            }
+          ]
+        },
+        {
+          "type": "code",
+          "lang": "python",
+          "code": "import weakref\n\n\nclass WeakCache:\n    def __init__(self):\n        self._store = weakref.WeakValueDictionary()\n\n    def get(self, key):\n        return self._store.get(key)   # returns None if GC'd\n\n    def set(self, key, value):\n        self._store[key] = value\n\n# observer pattern — listener GC'd when nothing else holds it\nclass EventEmitter:\n    def __init__(self):\n        self._listeners = weakref.WeakSet()\n\n    def subscribe(self, listener):\n        self._listeners.add(listener)\n\n    def emit(self, event):\n        for listener in list(self._listeners):   # copy — set may shrink during iteration\n            listener(event)"
+        }
+      ]
+    }
+  ]
+}
