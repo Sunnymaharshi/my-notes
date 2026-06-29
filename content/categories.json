@@ -41,6 +41,8 @@
       "collections",
       "exceptions",
       "modules-packages",
+      "operators",
+      "concurrency",
       "fastapi"
     ]
   },
