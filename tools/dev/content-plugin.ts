@@ -12,7 +12,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { NoteSchema, type Note, type NoteMeta } from "../../src/lib/schema.ts";
 import { highlightNote } from "../lib/highlight.ts";
-import { buildSearchIndex } from "../../src/lib/search.ts";
+import { buildSearchIndex, buildCodeIndex } from "../../src/lib/search.ts";
 import type { ZodError } from "zod";
 
 const MIME: Record<string, string> = {
@@ -84,7 +84,7 @@ export function contentDevServer(): Plugin {
       };
 
       // Collect every valid note (drafts included, like the dev index) for the search index.
-      const buildSearch = async (): Promise<string> => {
+      const collectNotes = async (): Promise<Note[]> => {
         const dirs = await fs.readdir(notesDir, { withFileTypes: true });
         const notes: Note[] = [];
         for (const d of dirs) {
@@ -99,8 +99,10 @@ export function contentDevServer(): Plugin {
             // skip unparseable notes; buildIndex already logs them
           }
         }
-        return buildSearchIndex(notes);
+        return notes;
       };
+      const buildSearch = async () => buildSearchIndex(await collectNotes());
+      const buildCodeSearch = async () => buildCodeIndex(await collectNotes());
 
       server.middlewares.use(async (req, res, next) => {
         const url = req.url?.split("?")[0];
@@ -110,6 +112,10 @@ export function contentDevServer(): Plugin {
           if (url === "/content/search-index.json") {
             res.setHeader("Content-Type", "application/json");
             return res.end(await buildSearch());
+          }
+          if (url === "/content/search-index-code.json") {
+            res.setHeader("Content-Type", "application/json");
+            return res.end(await buildCodeSearch());
           }
           if (url === "/content/categories.json") {
             return sendJson(

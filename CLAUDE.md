@@ -1,168 +1,85 @@
 # CLAUDE.md
 
-Personal **developer-notes website**: searchable, label-able knowledge base for quick
-reference + pre-interview revision. Author is a senior FE. Full plan in `PLAN.md`. All 6
-phases done; migration is the remaining work (see Status).
+Personal **developer-notes website**: searchable, label-able knowledge base for quick reference + pre-interview revision. Author is a senior FE. All phases shipped; only content migration remains.
 
 ## Locked decisions (don't re-litigate)
 
-1. **Content = structured JSON block-tree**, one note per file (`index.json`). Not MD/MDX/HTML
-   (HTML is build output only). Model source of truth: `src/lib/schema.ts` (Zod) — validated
-   at build, admin save, and import.
-2. **Single content repo.** Old notes migrated in once; never pulled from old repos after.
-3. **Two authoring paths**, both emit schema-valid JSON: (a) **admin studio** (`npm run admin`,
-   localhost-only, no DB, never deployed); (b) **conversion** of raw notes → JSON via the
-   deterministic `npm run convert` parser + hand enrichment (`tools/convert/README.md`).
-   AI is only ever an *external/manual* aid on the JSON; nothing in the repo or site calls a model.
+1. **Content = structured JSON block-tree**, one note per file (`index.json`). Not MD/MDX. HTML is build output only. Source of truth: `src/lib/schema.ts` (Zod) — validated at build, admin save, and import.
+2. **Single content repo.** Old notes migrated in once; never pulled from old repos again.
+3. **Two authoring paths** (both emit schema-valid JSON): (a) **admin studio** (`npm run admin`, localhost-only, never deployed); (b) **`npm run convert`** deterministic parser + hand enrichment. AI is external/manual only — nothing in the repo calls a model.
 4. **Display:** collapsible **tree/outline** default; doc + flashcard views derive from same tree.
-5. **Stack:** pure client-rendered **React SPA** (no SEO → no SSG/SSR). Vite + React + TS,
-   React Router, **CSS Modules** (no Tailwind), **Framer Motion**, **Shiki** (build-time
-   highlighting), **Radix** (`react-tooltip`, `react-dialog`), **cmdk**, **MiniSearch**,
-   Zustand/context. Self-hosted type via `@fontsource`: **Inter** (sans=UI/prose, chosen for
-   on-screen legibility), **IBM Plex Serif** (titles/reading), **IBM Plex Mono** (code+labels).
-   Client fetches a note's JSON at runtime; React serializer
-   renders the block-tree. Static host + SPA fallback. Upgrade path if first-paint matters:
-   `vite-react-ssg` (non-destructive). **UI direction = "Field Manual"** (see `src/index.css`
-   token layer; tokens drive the whole look — edit there, not per-component).
-6. **Search:** custom **MiniSearch index built from JSON** at build (no backend); lazy-loaded,
-   queried in-memory with fuzzy/prefix, label+category facets, node-level deep links.
-7. **Performance:** load only the opened note (per-note JSON, lazy by route); a slim metadata
-   index (`id,title,category,labels,summary`) loads once for lists/search/Cmd-K; `code`
-   pre-highlighted at build. Don't shorten schema keys (compression handles it; keep readable).
+5. **Stack:** React SPA (Vite + React + TS, React Router, CSS Modules, Framer Motion, Shiki, Radix, cmdk, MiniSearch, Zustand/context). Self-hosted fonts via `@fontsource`: **Inter** (UI/prose), **IBM Plex Mono** (code+labels). Static host + SPA fallback. **UI = "Field Manual"** — token layer in `src/index.css` drives the whole look; edit there, not per-component.
+6. **Search:** MiniSearch indexes are **pre-serialized at build** (`scripts/build-content.ts` / dev `content-plugin.ts`) and loaded once in the browser — search never walks raw JSON at query time. **Two indexes:** `search-index.json` is the slim default (title/summary/labels/category/prose `content` + low-boost `tables`, **no code**) and always loads; `search-index-code.json` holds code only and is **fetched lazily** the first time a user runs **deep search**. Keeping code out of the default index keeps the always-loaded payload flat as code content grows — code is the main size driver. `runSearch(query, facets, { deep })` merges code-index hits (score-scaled by `CODE_SCORE_SCALE`) when deep is on; the command palette exposes deep via a zero-result "Search inside code" nudge. `localStorage` stores recent searches only.
+7. **Performance:** per-note JSON lazy by route; slim metadata index (`id,title,category,labels,summary`) loads once. Code pre-highlighted at build (Shiki). Don't shorten schema keys.
 
 ## Content schema (v1)
 
 Envelope: `schemaVersion, id, title, category, labels[], summary, difficulty?, related?[], updated, draft, body[]`.
-`body` = array of typed block nodes:
 
 | type | shape |
 |---|---|
 | `outline` | `{ text, children?[], note?, role? }` |
-| `text` | `{ text }` — free-form prose paragraph(s); blank line splits paragraphs |
-| `code` | `{ lang, code, filename?, highlight?[] }` — scrollable, hover "expand" to full height; no title/copy bar. `filename` (optional) renders a blended header (filename + lang) above the code; absent → header-less |
+| `text` | `{ text }` — prose paragraph(s) |
+| `code` | `{ lang, code, filename?, highlight?[] }` |
 | `image` | `{ src, alt, caption? }` |
 | `callout` | `{ variant, text }` |
 | `table` | `{ headers[], rows[][] }` |
 | `flashcard` | `{ q, a }` |
-| `link` | `{ url, text? }` — labelled hyperlink (e.g. source-code reference) |
+| `link` | `{ url, text? }` |
 
-`text` is a string in v1, upgradeable to spans+marks later without migrating notes.
-**Extensibility rule:** new capability = new `type` + renderer + editor control; never break existing types.
+**Extensibility:** new capability = new `type` + renderer + editor control; never mutate existing types. Additive changes (new type/optional field) need no version bump. Breaking changes bump `CURRENT_SCHEMA_VERSION` + add a migration in `scripts/migrate-content.ts` (run `npm run migrate`). Build fails if any note's version drifts from current.
 
-**Schema versioning (TOOLS.md):** the envelope carries `schemaVersion`; `CURRENT_SCHEMA_VERSION`
-lives in `schema.ts`. *Additive* changes (new `type`/optional field/enum member) need no bump —
-ship them; the renderer's unknown-type fallback degrades gracefully. *Breaking* changes (an
-existing type/field changes shape or is removed) bump the version + add a migration in
-`scripts/migrate-content.ts` (`npm run migrate` rewrites notes-on-disk). The build gate fails on
-any note behind/ahead of current, so disk and code never silently drift. Pre-versioning notes read
-as v1.
+**Catalog:** `content/domains.json` (broad domains) → `content/categories.json` (technologies, each with a `domain`). A note's `category` resolves its domain via the catalog. Both Zod-validated.
 
-**Catalog: domain → category → note.** `content/domains.json` = broad domains (frontend,
-backend, system-design, devops, ai, cloud); `content/categories.json` = technologies, each with
-a `domain`. A note's `category` resolves its domain via the catalog (domain not stored on note).
-Both Zod-validated; every reference must resolve to a real entry.
+**`role: "topic"`** on outline nodes marks self-contained, deep-linkable units. Search result clicks resolve to nearest topic. Untagged notes fall back to outline-with-children.
 
-**`role` (outline only):** `role: "topic"` marks a self-contained, showable unit — the deep-link
-target for search. Topics nest freely; "sub-topic" = a topic with a parent topic. Unmarked nodes
-are detail lines in the nearest topic. **Decoupled from indentation depth.** Enum is extensible.
-
-**`highlight?[]` (code):** 1-based line numbers; Shiki tags `.highlighted` at build (no client highlighter).
+**`highlight?[]`** on code: 1-based line numbers; Shiki tags `.highlighted` at build.
 
 ## Layout
 
 ```
-content/notes/<id>/index.json   # note source of truth (+ colocated images)
-content/categories.json         # technologies, each with a `domain`
-content/domains.json            # broad domains; top of the catalog
+content/notes/<id>/index.json   # source of truth (+ colocated images)
+content/categories.json / domains.json
 public/content/                 # GENERATED by `npm run content` — do not edit
-scripts/build-content.ts        # validate notes+domains+categories; emit metadata index
-scripts/dupes.ts                # `npm run dupes` — duplicate report
-scripts/migrate-content.ts      # `npm run migrate` — upgrade notes to CURRENT_SCHEMA_VERSION
-tools/dev/content-plugin.ts     # dev: serve notes/categories/domains live from content/
-tools/lib/highlight.ts          # Shiki dual-theme codeHtml + highlight[] tagging
-tools/convert/{parse.ts,README.md}  # notes file -> skeleton JSON (deterministic) + procedure
-tools/admin/                    # local studio (npm run admin): API + block editor + preview
-tools/admin/CatalogDialog.tsx   # edit domains+categories (PUT /api/{domains,categories})
-vite.admin.config.ts            # admin Vite config (port 5174; never deployed)
-TOOLS.md                        # tooling commands + migration guide
-src/lib/schema.ts               # Zod schema (single source of truth): Note + Domain + Category
-src/lib/content.ts              # runtime fetch helpers (memoized) + resolveAsset
-src/lib/tree.ts                 # path steps + resolveTopic (nearest-topic climb for deep links)
-src/lib/cards.ts                # flashcard collector (explicit cards, else outline note pairs)
-src/lib/bookmarks.ts            # localStorage bookmark store (useSyncExternalStore)
-src/lib/useTheme.ts             # dark/light theme toggle (bootstrapped in index.html)
-src/lib/useContent.ts           # shared index+categories+domains hook (+ catalog helpers)
-src/lib/dupes.ts                # duplication detection (shared: CLI + admin flag)
-src/lib/search.ts               # MiniSearch config + per-note doc walker + runSearch
-src/index.css                   # design-token layer ("Field Manual"): color/type/space/motion + base
-src/main.tsx                    # Router + MotionConfig(reducedMotion) + Radix Tooltip provider
-src/components/Layout.tsx       # sidebar (domain→category→notes) + theme/bookmarks + mobile drawer
-src/components/NoteView.tsx     # header + bookmark + view switcher + reading-column/spine grid + Related
-src/components/OutlineSpine.tsx # signature: sticky "On this page" TOC w/ scroll-spy + copy-deep-link
-src/components/CommandPalette.tsx # Cmd-K search: term highlighting + recent searches (localStorage)
-src/components/ui/Tooltip.tsx   # Radix tooltip wrapper (icon-button labels); provider in main.tsx
+src/lib/schema.ts               # Zod schema (single source of truth)
+src/lib/search.ts               # MiniSearch config + doc walker + runSearch
+src/lib/content.ts              # runtime fetch helpers (memoized)
+src/lib/tree.ts / cards.ts / bookmarks.ts / useTheme.ts / useContent.ts / dupes.ts
+src/index.css                   # design-token layer ("Field Manual"): all color/type/space/motion
+src/main.tsx                    # Router + MotionConfig + Radix Tooltip provider
+src/components/Layout.tsx       # sidebar + mobile drawer + FAB + progress bar
+src/components/NoteView.tsx     # header + bookmark + view switcher + reading grid + Related
+src/components/OutlineSpine.tsx # sticky "On this page" TOC: scroll-spy + jump + copy-deep-link
+src/components/CommandPalette.tsx # Cmd-K search: term highlighting + recent searches
 src/components/views/           # TreeView / DocView / FlashcardView / TopicView
 src/components/blocks/          # one renderer per node type + TreeContext/NoteContext
 src/pages/                      # Home / Category / Note / Label
+scripts/build-content.ts        # validate + emit metadata index
+scripts/migrate-content.ts      # npm run migrate — upgrade notes to CURRENT_SCHEMA_VERSION
+tools/admin/                    # local studio
+tools/convert/{parse.ts,README.md}
 ```
 
-Commands: `npm run content` (validate+generate), `npm run convert -- <file> [--write]`,
-`npm run admin`, `npm run dupes`, `npm run migrate [-- --check]`, `npm run dev`, `npm run build`,
-`npm run validate` (check only).
+Commands: `npm run content`, `npm run convert -- <file> [--write]`, `npm run admin`, `npm run dupes`, `npm run migrate [-- --check]`, `npm run dev`, `npm run build`, `npm run validate`.
 
 ## Conventions
 
-- **Schema-first:** change `schema.ts` before its consumers (renderer, admin, conversion). A
-  *breaking* model change also bumps `CURRENT_SCHEMA_VERSION` + adds a `scripts/migrate-content.ts`
-  migration (run `npm run migrate`); additive ones don't (see Content schema § Schema versioning).
-- **Converting:** fence code in source, run `npm run convert` for the faithful structural parse
-  (don't AI-transcribe whole files), then enrich. Must pass `npm run content`.
-- **Migration** (TOOLS.md): `category` = technology (root), `id` = note. Multi-file tech →
-  multiple notes under one `--category`, or one merged note via `--append <id>`.
-- **Dev vs prod:** dev serves live from `content/` (drafts shown, schema errors tolerated/logged);
-  prod `npm run content` is strict and **excludes `draft: true`**.
-- **Catalog edits** via admin "Manage catalog" or by hand. **Renaming a category's id cascades**
-  into every referencing note (admin sends `{categories,renames}`). Deleting a category notes
-  still reference is **blocked by the admin** (409, lists the orphaned notes — reassign/rename
-  first); a by-hand edit still surfaces as `unknown category` on next `npm run content`. (Same
-  for removing a domain a category points at — caught at build.)
-- **Topics:** mark self-contained units with `role: "topic"` (admin Topic checkbox). `npm run
-  convert` auto-seeds topics on depth 0–1 branches; refine by hand. Search deep-links resolve UP
-  to nearest topic; untagged notes fall back to "nearest outline-with-children".
-- **Deploy:** `public/content/` is gitignored build output; deploy runs `npm run build`, whose
-  `prebuild` hook (`npm run content`) regenerates it. No generated files in git.
-- Keep production static + DB-free; only admin runs locally/stateful. Match existing code style.
-  Don't commit/push unless asked.
+- **Schema-first:** change `schema.ts` before consumers. Breaking change → bump version + migration.
+- **Dev vs prod:** dev serves live from `content/` (drafts shown, errors tolerated); prod is strict, excludes `draft: true`.
+- **Topics:** mark self-contained units `role: "topic"`. `npm run convert` auto-seeds depth 0–1; refine by hand.
+- **Catalog edits:** via admin "Manage catalog" or by hand. Renaming a category id cascades into notes (admin). Deleting a referenced category is blocked by admin (409); by-hand edits surface as `unknown category` at next build.
+- **Deploy:** `public/content/` is gitignored; deploy runs `npm run build` which calls `npm run content` as prebuild. No generated files in git. Static + DB-free in production.
+- Match existing code style. Don't commit/push unless asked.
+
+## Mobile / responsive
+
+- Layout uses `100dvh` so the shell tracks the visual viewport as mobile URL bars appear/disappear.
+- Search FAB hidden on the home page. On other pages: `position: fixed; bottom: 36px; right: 24px` (above iOS home indicator, in the thumb zone). Main content has `padding-bottom: 104px` on mobile to keep content above the FAB.
+- Command palette input uses `autocomplete="off" inputMode="search"` to suppress browser autofill. Mobile-only `✕` close button in the input row.
+- Tables and code blocks use `max-width: 100%` + internal `overflow-x: auto` — they scroll internally without causing page-level overflow.
 
 ## Status
 
-All phases done: (1) Vite+React+TS SPA, Zod schema, content build/validation, dev live-serve,
-convert parser. (2) Router (Home/Category/Note/Label), component-per-node renderer, animated
-collapsible TreeView + revision mode, Shiki build-time highlighting, images, copy-code,
-click-to-reveal flashcards. (3) MiniSearch search (weighted fields, prefix+fuzzy, label/category
-facets), Cmd-K/`/` palette with node-level deep-links, anchors + force-expand/flash, label cloud,
-faceted LabelPage. (4) Admin studio (three-pane: list · form+block editor · live preview via real
-NoteView; Zod-validated save; labels autocomplete; image upload; import-from-txt via `parse()`);
-duplication detection (`src/lib/dupes.ts` + `npm run dupes` CLI + admin ⚠ flag). (5) Learning UX:
-Outline/Document/Flashcards view switcher, keyboard flashcard deck (←/→, Space/Enter flip, `s`
-shuffle), localStorage bookmarks, dark/light theme (FOUC-free). (6) Catalog `domain→category→topic`,
-recursive `topic` role + `resolveTopic` search-click resolution (TopicView flashes matched line +
-"go up" trail), Shiki dual-theme dark code, `highlight[]` lines, `related[]` footer + `updated`
-header, admin topic toggle + catalog CRUD. (7) **UI/UX redesign — "Field Manual"**: IBM Plex type
-system + token layer (`src/index.css`), highlighter-amber signature accent, dark "ink" / light
-"paper" themes, sidebar + mobile drawer, editorial NoteView, **outline-spine TOC** (scroll-spy +
-copy-deep-link, `OutlineSpine.tsx`), search **term-highlighting + recent searches** in the palette,
-Radix tooltips, reduced-motion-aware route/reveal motion.
+All phases done. Only the `fastapi` note exists — bulk content migration is the remaining work (see TOOLS.md + MIGRATION.md).
 
-Only the `fastapi` note exists so far.
-
-### Known issues / future work
-
-- **No tests.** Pure modules (`search.ts`, `tree.ts`, `cards.ts`, `dupes.ts`) are ideal unit targets.
-  `OutlineSpine.collectTopics` (topic walk + fallback) and the palette `highlight` term-splitter
-  are also pure and testable.
-- Done in the redesign (was future work): per-topic "On this page" TOC (`OutlineSpine`) +
-  copy-deep-link; search term-highlighting. **Still open:** prev/next sibling nav (the spine is the
-  natural home), SM-2 spaced repetition, Mermaid block, hover-prefetch, wiki cross-note links
-  (needs spans/marks), print/export-to-Markdown.
-- **Next:** bulk-convert remaining repo notes per `TOOLS.md` (seed role/category/domain).
+**Open / future:** no tests (pure modules `search.ts`, `tree.ts`, `cards.ts`, `dupes.ts` are ideal targets); prev/next sibling nav; SM-2 spaced repetition; Mermaid block; hover-prefetch; wiki cross-note links; print/export.

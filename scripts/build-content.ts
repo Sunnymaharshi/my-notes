@@ -24,7 +24,7 @@ import {
   type NoteMeta,
 } from "../src/lib/schema.ts";
 import { highlightNote } from "../tools/lib/highlight.ts";
-import { buildSearchIndex } from "../src/lib/search.ts";
+import { buildSearchIndex, buildCodeIndex } from "../src/lib/search.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
@@ -172,6 +172,7 @@ async function main() {
   if (!checkOnly) {
     await fs.writeFile(path.join(outDir, "index.json"), JSON.stringify(meta, null, 0));
     await fs.writeFile(path.join(outDir, "search-index.json"), buildSearchIndex(published));
+    await fs.writeFile(path.join(outDir, "search-index-code.json"), buildCodeIndex(published));
     await fs.copyFile(
       path.join(contentDir, "categories.json"),
       path.join(outDir, "categories.json"),

@@ -67,6 +67,7 @@ export function CommandPalette({ open, onOpenChange }: Props) {
   const [recents, setRecents] = useState<string[]>([]);
   const [sort, setSort] = useState<"relevance" | "recent">("relevance");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [deep, setDeep] = useState(false);
 
   // Reset state each time the palette opens/closes.
   useEffect(() => {
@@ -76,12 +77,14 @@ export function CommandPalette({ open, onOpenChange }: Props) {
     } else {
       setSort("relevance");
       setActiveCategory(null);
+      setDeep(false);
     }
   }, [open]);
 
-  // Reset category filter when query changes (new search = fresh context).
+  // Reset category filter + deep mode when query changes (new search = fresh context).
   useEffect(() => {
     setActiveCategory(null);
+    setDeep(false);
   }, [query]);
 
   // Run search; ignore stale responses.
@@ -94,14 +97,14 @@ export function CommandPalette({ open, onOpenChange }: Props) {
     }
     let cancelled = false;
     setSearching(true);
-    runSearch(q)
+    runSearch(q, {}, { deep })
       .then((res) => !cancelled && setHits(res))
       .catch(() => !cancelled && setHits([]))
       .finally(() => !cancelled && setSearching(false));
     return () => {
       cancelled = true;
     };
-  }, [query]);
+  }, [query, deep]);
 
   const allNotes = useMemo(
     () => [...index].sort((a, b) => a.title.localeCompare(b.title)),
@@ -183,6 +186,20 @@ export function CommandPalette({ open, onOpenChange }: Props) {
           inputMode="search"
           name="notes-search"
         />
+        {showHits && (
+          <button
+            className={styles.scopeChip + (deep ? " " + styles.scopeChipOn : "")}
+            onClick={() => setDeep((d) => !d)}
+            type="button"
+            aria-pressed={deep}
+            title={deep ? "Searching code blocks too — click to exclude" : "Also search inside code blocks"}
+          >
+            <span className={styles.scopeChipGlyph} aria-hidden="true">
+              {"{ }"}
+            </span>
+            code
+          </button>
+        )}
         {searching && <span className={styles.spinner} aria-hidden="true" />}
         <button
           className={styles.closeBtn}
@@ -238,10 +255,12 @@ export function CommandPalette({ open, onOpenChange }: Props) {
       <Command.List className={styles.list}>
         {showHits ? (
           <>
-            {!searching && (
-              <Command.Empty className={styles.empty}>
-                No matches for &ldquo;{query.trim()}&rdquo;.
-              </Command.Empty>
+            {/* Own empty line (not Command.Empty): the scope row below is always an
+                item, so cmdk would never consider the list empty. */}
+            {!searching && visibleHits.length === 0 && (
+              <div className={styles.empty}>
+                No matches{deep ? " in notes or code" : " in notes"} for &ldquo;{query.trim()}&rdquo;.
+              </div>
             )}
             {visibleHits.map((h) => (
               <Command.Item

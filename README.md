@@ -22,14 +22,17 @@ deck.
   - **Flashcards** — a keyboard-driven "test me" study deck. Sources explicit `flashcard`
     blocks; if a note has none, it falls back to outline `note` pairs so the deck is still
     useful. **Keys:** `←/→` prev/next, `Space`/`Enter` flip, `s` shuffle; progress bar.
-- **Search** — custom MiniSearch index built from the note JSON at build time. Fuzzy +
-  prefix type-ahead, weighted fields, label/category facets, and **node-level deep links**
-  (a hit jumps to the exact subtopic, auto-expands its ancestors, and flashes it). Matched
-  terms are **highlighted** in results.
+- **Search** — MiniSearch index built in the browser on first search (fetches all note JSON,
+  indexes in memory, caches for the session — no backend). Fuzzy + prefix type-ahead, weighted
+  fields, label/category facets, and **node-level deep links** (a hit jumps to the exact
+  subtopic, auto-expands its ancestors, and flashes it). Matched terms are **highlighted** in
+  results.
 - **Command palette** — `⌘K` / `Ctrl-K` toggles, `/` opens. Jump to any note or search hit;
-  remembers your **recent searches**.
+  remembers your **recent searches**. On mobile: autofill suppressed, close `✕` button in
+  the input row.
 - **On this page (outline spine)** — a sticky topic TOC beside each note that tracks your
-  scroll position live, jumps on click, and **copies a deep link** per topic.
+  scroll position live (scroll-spy), jumps + locks the indicator on click, and **copies a
+  deep link** per topic.
 - **Labels** — clickable label chips, a home-page label cloud, and faceted label pages
   (combine co-occurring labels + in-facet text search).
 - **Bookmarks** — star any note; bookmarks persist to `localStorage`, show in the sidebar,
@@ -38,6 +41,9 @@ deck.
   preference, applied before first paint (no flash).
 - **Code** — pre-highlighted at build time with Shiki (no highlighter shipped to the
   browser), with copy-to-clipboard. Images are colocated per note and lazy-loaded.
+- **Mobile** — responsive layout using `100dvh` (tracks visual viewport as URL bars show/
+  hide). Tables and code blocks scroll internally without causing page-level overflow. Search
+  FAB is thumb-reachable and hidden on the home page.
 
 ### Content model
 - One note per file: `content/notes/<id>/index.json`, validated by a single **Zod schema**
@@ -172,4 +178,4 @@ GitHub Pages. Build command `npm run build`, output directory `dist/`. The admin
 - **[TOOLS.md](TOOLS.md)** — tooling and build commands.
 - **[MIGRATION.md](MIGRATION.md)** — step-by-step guide to bringing existing notes into the site.
 - **[tools/convert/README.md](tools/convert/README.md)** — the convert → enrich procedure + node cheat sheet.
-- **[CLAUDE.md](CLAUDE.md)** — condensed instructions and project status.
+- **[CLAUDE.md](CLAUDE.md)** — condensed architecture, conventions, and project status (for AI coding assistants).

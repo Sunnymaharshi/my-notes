@@ -43,11 +43,26 @@ export interface SearchDoc {
   labelsText: string;
   labels: string[];
   summary: string;
-  /** concatenated text of normal-weight nodes (outline/callout/table/flashcard/image) */
+  /** concatenated prose (outline/text/callout/flashcard/image/link/pre) */
   content: string;
-  /** concatenated code (low weight, separate field) */
+  /** concatenated table text (low weight, separate field — tables are noisier prose) */
+  tables: string;
+  /** per-node text (excluding code), kept for deep-link target resolution */
+  nodes: SearchNode[];
+}
+
+/** A note's code, indexed separately and loaded lazily for opt-in "deep" search.
+ *  Code is the main driver of index size, so keeping it out of the default index
+ *  keeps the always-loaded payload flat as code content grows. */
+export interface CodeDoc {
+  id: string;
+  title: string;
+  category: string;
+  labels: string[];
+  summary: string;
+  /** concatenated code across the note */
   code: string;
-  /** per-node text, kept for deep-link target resolution */
+  /** per-code-node text, kept for deep-link target resolution */
   nodes: SearchNode[];
 }
 
@@ -75,10 +90,12 @@ function nodeText(node: BlockNode): string {
   }
 }
 
-/** Build the search document for a note: walk `body` collecting per-node text + paths. */
-export function noteToSearchDoc(note: Note): SearchDoc {
-  const nodes: SearchNode[] = [];
+/** Walk a note's `body`, partitioning per-node text into prose, table, and code buckets. */
+function walkNote(note: Note) {
+  const proseNodes: SearchNode[] = [];
+  const codeNodes: SearchNode[] = [];
   const contentParts: string[] = [];
+  const tableParts: string[] = [];
   const codeParts: string[] = [];
 
   const walk = (list: BlockNode[], prefix: string) => {
@@ -86,14 +103,25 @@ export function noteToSearchDoc(note: Note): SearchDoc {
       const path = prefix ? `${prefix}.${i}` : String(i);
       const text = nodeText(node).trim();
       if (text) {
-        nodes.push({ id: path, t: text });
-        (node.type === "code" ? codeParts : contentParts).push(text);
+        if (node.type === "code") {
+          codeNodes.push({ id: path, t: text });
+          codeParts.push(text);
+        } else {
+          proseNodes.push({ id: path, t: text });
+          (node.type === "table" ? tableParts : contentParts).push(text);
+        }
       }
       if (node.type === "outline" && node.children) walk(node.children, path);
     });
   };
   walk(note.body, "");
 
+  return { proseNodes, codeNodes, contentParts, tableParts, codeParts };
+}
+
+/** Build the default (code-free) search document for a note. */
+export function noteToSearchDoc(note: Note): SearchDoc {
+  const { proseNodes, contentParts, tableParts } = walkNote(note);
   return {
     id: note.id,
     title: note.title,
@@ -102,14 +130,29 @@ export function noteToSearchDoc(note: Note): SearchDoc {
     labels: note.labels,
     summary: note.summary,
     content: contentParts.join("\n"),
+    tables: tableParts.join("\n"),
+    nodes: proseNodes,
+  };
+}
+
+/** Build the code-only search document for a note (lazy "deep" index). */
+export function noteToCodeDoc(note: Note): CodeDoc {
+  const { codeNodes, codeParts } = walkNote(note);
+  return {
+    id: note.id,
+    title: note.title,
+    category: note.category,
+    labels: note.labels,
+    summary: note.summary,
     code: codeParts.join("\n"),
-    nodes,
+    nodes: codeNodes,
   };
 }
 
 // ---- MiniSearch config (shared by build + load) ----------------------------
 
-const FIELDS = ["title", "summary", "labelsText", "category", "content", "code"];
+const FIELDS = ["title", "summary", "labelsText", "category", "content", "tables"];
+const CODE_FIELDS = ["code"];
 const STORE_FIELDS = ["id", "title", "category", "summary", "labels", "nodes"];
 
 export const miniSearchConfig: MiniSearchOptions = {
@@ -117,18 +160,43 @@ export const miniSearchConfig: MiniSearchOptions = {
   storeFields: STORE_FIELDS,
 };
 
+export const codeSearchConfig: MiniSearchOptions = {
+  fields: CODE_FIELDS,
+  storeFields: STORE_FIELDS,
+};
+
+// Prefix matching stays on for every term so type-ahead works from the first keystroke
+// ("fa" -> "fastapi"). Fuzzy, though, is gated to longer tokens: short ones otherwise fuzz
+// into common words — an identifier like "HTTP_200_OK" tokenizes to http/200/ok, and "ok"
+// is within edit-distance 1 of "of"/"or"/"on", flooding the OR fallback with the whole corpus.
+const fuzzyForTerm = (term: string) => (term.length >= 5 ? 0.2 : false);
+
 /** Query-time options: type-ahead (prefix + fuzzy), weighted by field.
  *  `combineWith` is set per-query by `runSearch` (AND first, OR fallback). */
 export const searchQueryOptions = {
   prefix: true,
-  fuzzy: 0.35,
-  boost: { title: 6, summary: 4, labelsText: 3, category: 2, content: 1.5, code: 0.6 },
+  fuzzy: fuzzyForTerm,
+  boost: { title: 6, summary: 4, labelsText: 3, category: 2, content: 1.5, tables: 0.6 },
 };
 
-/** Build a MiniSearch index from notes and serialize it (build-time). */
+/** Deep-mode query options for the code index. */
+export const codeQueryOptions = {
+  prefix: true,
+  fuzzy: fuzzyForTerm,
+};
+
+/** Build the default MiniSearch index (no code) and serialize it (build-time). */
 export function buildSearchIndex(notes: Note[]): string {
   const mini = new MiniSearch(miniSearchConfig);
   mini.addAll(notes.map(noteToSearchDoc));
+  return JSON.stringify(mini);
+}
+
+/** Build the code-only MiniSearch index and serialize it (build-time, loaded lazily). */
+export function buildCodeIndex(notes: Note[]): string {
+  const mini = new MiniSearch(codeSearchConfig);
+  // Skip notes with no code so the index carries only what deep search needs.
+  mini.addAll(notes.map(noteToCodeDoc).filter((d) => d.code.length > 0));
   return JSON.stringify(mini);
 }
 
@@ -161,8 +229,9 @@ interface StoredResult {
 const SNIPPET_MAX = 140;
 
 let loadPromise: Promise<MiniSearch> | null = null;
+let codeLoadPromise: Promise<MiniSearch> | null = null;
 
-/** Lazy-load and deserialize the prebuilt index (fetched once, then cached). */
+/** Lazy-load and deserialize the prebuilt default index (fetched once, then cached). */
 export function loadSearchIndex(base = "/content"): Promise<MiniSearch> {
   loadPromise ??= (async () => {
     const res = await fetch(`${base}/search-index.json`);
@@ -170,6 +239,16 @@ export function loadSearchIndex(base = "/content"): Promise<MiniSearch> {
     return MiniSearch.loadJSON(await res.text(), miniSearchConfig);
   })();
   return loadPromise;
+}
+
+/** Lazy-load the prebuilt code index — only fetched the first time deep search runs. */
+export function loadCodeIndex(base = "/content"): Promise<MiniSearch> {
+  codeLoadPromise ??= (async () => {
+    const res = await fetch(`${base}/search-index-code.json`);
+    if (!res.ok) throw new Error(`Failed to load code search index (${res.status})`);
+    return MiniSearch.loadJSON(await res.text(), codeSearchConfig);
+  })();
+  return codeLoadPromise;
 }
 
 function snippet(text: string): string {
@@ -213,10 +292,20 @@ export interface SearchFacets {
   category?: string;
 }
 
+export interface SearchOptions {
+  /** Also search inside code blocks (loads the lazy code index). */
+  deep?: boolean;
+}
+
+/** Code hits are merged after prose hits; scale their scores so code never outranks
+ *  a prose match of comparable strength (mirrors the old in-index code boost of 0.6). */
+const CODE_SCORE_SCALE = 0.6;
+
 /** Run a query against the loaded index; returns hits with deep-link targets. */
 export async function runSearch(
   query: string,
   facets: SearchFacets = {},
+  options: SearchOptions = {},
   base = "/content",
 ): Promise<SearchHit[]> {
   const q = query.trim();
@@ -237,6 +326,17 @@ export async function runSearch(
   // extra word never drops the hit entirely (e.g. "redis script" -> "redis lua scripts").
   let results = search("AND");
   if (results.length === 0) results = search("OR");
+
+  // Deep search additionally queries the lazily-loaded code index and merges its hits.
+  if (options.deep) {
+    const code = await loadCodeIndex(base);
+    const codeSearch = (combineWith: "AND" | "OR") =>
+      code.search(q, { ...codeQueryOptions, combineWith, filter }) as unknown as StoredResult[];
+    let codeResults = codeSearch("AND");
+    if (codeResults.length === 0) codeResults = codeSearch("OR");
+    for (const cr of codeResults) cr.score *= CODE_SCORE_SCALE;
+    results = results.concat(codeResults);
+  }
 
   // Expand each note into one result per matching subtopic (deep-linkable), so a single
   // note surfaces several relevant landing spots rather than collapsing to one. Results

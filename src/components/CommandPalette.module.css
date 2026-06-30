@@ -326,10 +326,68 @@
 }
 
 .empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
   color: var(--text-dim);
   font-size: 14px;
   padding: 22px 12px;
   text-align: center;
+}
+
+/* Scope toggle in the input row: widen search to include code blocks.
+   Off = quiet outline; on = amber fill. One control, two states. */
+.scopeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 3px 9px 3px 7px;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color var(--dur-1), border-color var(--dur-1), background var(--dur-1);
+}
+
+.scopeChip:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.scopeChipGlyph {
+  font-weight: 700;
+  letter-spacing: -0.08em;
+  color: var(--text-faint);
+  transition: color var(--dur-1);
+}
+
+.scopeChip:hover .scopeChipGlyph {
+  color: var(--text-dim);
+}
+
+/* On: the search now includes code. */
+.scopeChipOn,
+.scopeChipOn:hover {
+  color: var(--hl);
+  background: var(--hl-soft);
+  border-color: var(--hl);
+}
+
+.scopeChipOn .scopeChipGlyph,
+.scopeChipOn:hover .scopeChipGlyph {
+  color: var(--hl);
+}
+
+.scopeChip:focus-visible {
+  outline: 2px solid var(--hl);
+  outline-offset: 1px;
 }
 
 .footer {
