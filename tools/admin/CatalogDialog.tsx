@@ -6,6 +6,7 @@
  */
 import { useState } from "react";
 import type { Category, Domain } from "../../src/lib/schema.ts";
+import { colorFromId } from "../../src/lib/color.ts";
 import { api, ApiError } from "./api.ts";
 
 export function CatalogDialog({
@@ -104,7 +105,15 @@ export function CatalogDialog({
                 <div className="catalogRow" key={i}>
                   <input className="cId" placeholder="id" value={d.id} onChange={(e) => patchDom(i, { id: e.target.value })} />
                   <input placeholder="label" value={d.label} onChange={(e) => patchDom(i, { label: e.target.value })} />
-                  <input className="cColor" placeholder="#color" value={d.color ?? ""} onChange={(e) => patchDom(i, { color: e.target.value })} />
+                  <span className="cColorWrap" title={d.color ? "Custom color — click ✕ to reset to auto" : "Auto color from id"}>
+                    <input
+                      className="cColor"
+                      type="color"
+                      value={d.color || colorFromId(d.id || "default")}
+                      onChange={(e) => patchDom(i, { color: e.target.value })}
+                    />
+                    <button type="button" className="tiny cColorReset" title="Reset to auto" hidden={!d.color} onClick={() => patchDom(i, { color: "" })}>✕</button>
+                  </span>
                   <button className="tiny" title="Move up" disabled={i === 0} onClick={() => moveDom(i, -1)}>↑</button>
                   <button className="tiny" title="Move down" disabled={i === doms.length - 1} onClick={() => moveDom(i, 1)}>↓</button>
                   <button className="tiny danger" title="Delete" onClick={() => delDom(i)}>✕</button>
@@ -132,7 +141,15 @@ export function CatalogDialog({
                       </option>
                     ))}
                   </select>
-                  <input className="cColor" placeholder="#color" value={c.color ?? ""} onChange={(e) => patchCat(i, { color: e.target.value })} />
+                  <span className="cColorWrap" title={c.color ? "Custom color — click ✕ to reset to auto" : "Auto color from id"}>
+                    <input
+                      className="cColor"
+                      type="color"
+                      value={c.color || colorFromId(c.id || "default")}
+                      onChange={(e) => patchCat(i, { color: e.target.value })}
+                    />
+                    <button type="button" className="tiny cColorReset" title="Reset to auto" hidden={!c.color} onClick={() => patchCat(i, { color: "" })}>✕</button>
+                  </span>
                   <button className="tiny" title="Move up" disabled={i === 0} onClick={() => moveCat(i, -1)}>↑</button>
                   <button className="tiny" title="Move down" disabled={i === cats.length - 1} onClick={() => moveCat(i, 1)}>↓</button>
                   <button className="tiny danger" title="Delete" onClick={() => delCat(i)}>✕</button>

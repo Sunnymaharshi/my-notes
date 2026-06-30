@@ -85,7 +85,7 @@ const makeBlank = (cats: Category[]): Note => ({
   labels: [],
   summary: "",
   updated: new Date().toISOString().slice(0, 10),
-  draft: true,
+  draft: false,
   body: [],
 });
 
@@ -104,7 +104,7 @@ export function App() {
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [dupesOpen, setDupesOpen] = useState(false);
   const [filter, setFilter] = useState("");
-  const [envOpen, setEnvOpen] = useState(() => localStorage.getItem("admin:envOpen") !== "false");
+  const [envOpen, setEnvOpen] = useState(false);
   // Bumped on "+ New note" so the keyed Source pane remounts even when selectedId stays null.
   const [sourceNonce, setSourceNonce] = useState(0);
 
@@ -627,7 +627,7 @@ export function App() {
                     className="tiny iconBtn"
                     aria-label={envOpen ? "Collapse details" : "Expand details"}
                     title={envOpen ? "Collapse details" : "Expand details"}
-                    onClick={() => setEnvOpen((v) => { localStorage.setItem("admin:envOpen", String(!v)); return !v; })}
+                    onClick={() => setEnvOpen((v) => !v)}
                   >
                     <Chevron open={envOpen} />
                   </button>

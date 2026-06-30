@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useContent } from "../lib/useContent.ts";
 import { useLayoutContext } from "../components/Layout.tsx";
+import { colorFromId } from "../lib/color.ts";
 import styles from "./pages.module.css";
 
 export function HomePage() {
@@ -73,7 +74,7 @@ export function HomePage() {
                 key={c.id}
                 to={`/${c.id}`}
                 className={styles.card}
-                style={{ ["--c" as string]: c.color }}
+                style={{ ["--c" as string]: c.color || colorFromId(c.id) }}
               >
                 <span className={styles.cardDot} />
                 <span className={styles.cardTitle}>{c.label}</span>

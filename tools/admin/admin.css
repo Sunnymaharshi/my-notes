@@ -22,7 +22,7 @@
   background: var(--bg-elev);
 }
 .envScroll {
-  padding: 12px 20px 16px;
+  padding: 8px 16px 10px;
   max-height: 42vh;
   overflow-y: auto;
 }
@@ -404,8 +404,86 @@
 .envelope {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
 }
+/* rows 1 & 2: inputs/selects bottom-align so they sit on the same baseline */
+.envRow {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+/* row 3 (chips + inputs): top-align so chips don't push inputs down */
+.envRow.envRowTop {
+  align-items: flex-start;
+}
+.envRow:last-of-type {
+  border-bottom: none;
+  padding-bottom: 2px;
+}
+
+/* Uppercase micro-labels scoped to the envelope */
+.envelope .field > span:first-child,
+.envSummaryLabel > span:first-child {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+/* fixed-width fields */
+.envIdField   { width: 180px; flex-shrink: 0; }
+.envCatField  { width: 200px; flex-shrink: 0; }
+.envDiffField { width: 140px; flex-shrink: 0; }
+/* Draft as a styled pill — sits at flex-end of row 1 */
+.envDraftToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 5px 10px 5px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  user-select: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.envDraftToggle:has(input:checked) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.envDraftToggle input[type="checkbox"] {
+  width: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+/* Summary label row: text left, AI button right */
+.envSummaryLabel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+/* Smaller inputs inside the envelope */
+.envelope input,
+.envelope textarea,
+.envelope select {
+  padding: 5px 8px;
+  font-size: 13px;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -449,16 +527,21 @@
   gap: 6px;
 }
 .chip {
-  background: var(--bg-elev-2);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 999px;
-  padding: 2px 10px;
-  font-size: 12px;
+  background: var(--accent-soft);
+  border: 1px solid transparent;
+  color: var(--text-mid);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
   cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
 }
 .chip:hover {
-  border-color: #ff7b72;
+  border-color: var(--danger);
+  color: var(--danger);
+  background: transparent;
 }
 
 /* inputs */
@@ -1214,8 +1297,34 @@ button.toggle[data-on="true"] {
 .catalogRow .cId {
   flex: 0 0 90px;
 }
+.cColorWrap {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+}
 .catalogRow .cColor {
-  flex: 0 0 80px;
+  width: 32px;
+  height: 28px;
+  padding: 2px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  flex: none;
+}
+.cColorReset {
+  opacity: 0.5;
+  padding: 1px 4px;
+  font-size: 10px;
+  visibility: visible;
+}
+.cColorReset:hover {
+  opacity: 1;
+}
+.cColorReset[hidden] {
+  visibility: hidden;
+  display: inline-block !important;
+  pointer-events: none;
 }
 
 /* Asset manager: thumbnail grid of a note's colocated files. */

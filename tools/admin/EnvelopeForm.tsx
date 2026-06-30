@@ -181,20 +181,20 @@ export function EnvelopeForm({
 
   return (
     <div className="envelope">
-      <label className="field">
-        <span>Title</span>
-        <input
-          value={note.title}
-          onChange={(e) => {
-            const title = e.target.value;
-            onChange(idTouched ? { title } : { title, id: slugify(title) });
-          }}
-        />
-      </label>
-
-      <div className="row">
+      {/* Row 1: Title · id · Draft */}
+      <div className="envRow">
         <label className="field grow">
-          <span>id (folder; kebab-case)</span>
+          <span>Title</span>
+          <input
+            value={note.title}
+            onChange={(e) => {
+              const title = e.target.value;
+              onChange(idTouched ? { title } : { title, id: slugify(title) });
+            }}
+          />
+        </label>
+        <label className="field envIdField">
+          <span>ID</span>
           <input
             value={note.id}
             onChange={(e) => {
@@ -204,11 +204,41 @@ export function EnvelopeForm({
           />
           {note.id && noteIds.includes(note.id) && note.id !== savedId && (
             <span className="hint" style={{ color: "var(--color-error, #c0392b)" }}>
-              ⚠ id already exists
+              ⚠ already exists
             </span>
           )}
         </label>
-        <label className="field">
+        <label className="envDraftToggle">
+          <input
+            type="checkbox"
+            checked={note.draft}
+            onChange={(e) => onChange({ draft: e.target.checked })}
+          />
+          Draft
+        </label>
+      </div>
+
+      {/* Row 2: Summary · Category · Difficulty */}
+      <div className="envRow">
+        <label className="field grow">
+          <span className="envSummaryLabel">
+            <span>Summary</span>
+            <button
+              type="button"
+              className="tiny"
+              title="Copy an AI prompt (note content + existing labels/ids) to generate summary/labels/related"
+              onClick={copyAiPrompt}
+            >
+              {aiCopied ? "copied ✓" : "🤖 AI prompt"}
+            </button>
+          </span>
+          <textarea
+            rows={1}
+            value={note.summary}
+            onChange={(e) => onChange({ summary: e.target.value })}
+          />
+        </label>
+        <label className="field envCatField">
           <span>Category{selectedDomain ? ` · ${selectedDomain.label}` : ""}</span>
           <div className="row catRow">
             <select value={note.category} onChange={(e) => onChange({ category: e.target.value })}>
@@ -230,7 +260,7 @@ export function EnvelopeForm({
             </button>
           </div>
         </label>
-        <label className="field">
+        <label className="field envDiffField">
           <span>Difficulty</span>
           <select
             value={note.difficulty ?? ""}
@@ -246,98 +276,75 @@ export function EnvelopeForm({
         </label>
       </div>
 
-      <label className="field">
-        <span className="row">
-          Summary
-          <button
-            type="button"
-            className="tiny"
-            title="Copy an AI prompt (note content + existing labels/ids) to generate summary/labels/related"
-            onClick={copyAiPrompt}
-            style={{ marginLeft: "auto" }}
-          >
-            {aiCopied ? "copied ✓" : "🤖 Copy AI prompt"}
-          </button>
-        </span>
-        <textarea
-          rows={2}
-          value={note.summary}
-          onChange={(e) => onChange({ summary: e.target.value })}
-        />
-      </label>
-
-      <div className="field">
-        <span>Labels</span>
-        <div className="chips">
-          {note.labels.map((l) => (
-            <button key={l} className="chip" onClick={() => removeLabel(l)} title="Remove">
-              {l} ✕
-            </button>
-          ))}
+      {/* Row 3: Labels · Related */}
+      <div className="envRow envRowTop">
+        <div className="field grow">
+          <span>Labels</span>
+          {note.labels.length > 0 && (
+            <div className="chips">
+              {note.labels.map((l) => (
+                <button key={l} className="chip" onClick={() => removeLabel(l)} title="Remove">
+                  {l} ✕
+                </button>
+              ))}
+            </div>
+          )}
+          <input
+            list="all-labels"
+            placeholder="Add label and press Enter"
+            value={labelDraft}
+            onChange={(e) => setLabelDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addLabel(labelDraft);
+              }
+            }}
+          />
+          <datalist id="all-labels">
+            {allLabels.map((l) => (
+              <option key={l} value={l} />
+            ))}
+          </datalist>
         </div>
-        <input
-          list="all-labels"
-          placeholder="Add label, Enter"
-          value={labelDraft}
-          onChange={(e) => setLabelDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              addLabel(labelDraft);
-            }
-          }}
-        />
-        <datalist id="all-labels">
-          {allLabels.map((l) => (
-            <option key={l} value={l} />
-          ))}
-        </datalist>
-      </div>
-
-      <div className="field">
-        <span>Related notes</span>
-        <div className="chips">
-          {related.map((r) => (
-            <button
-              key={r}
-              className={idSet.has(r) ? "chip" : "chip bad"}
-              onClick={() => removeRelated(r)}
-              title={idSet.has(r) ? "Remove" : "Unknown note id — remove"}
-            >
-              {idSet.has(r) ? "" : "⚠ "}
-              {r} ✕
-            </button>
-          ))}
+        <div className="field grow">
+          <span>Related</span>
+          {related.length > 0 && (
+            <div className="chips">
+              {related.map((r) => (
+                <button
+                  key={r}
+                  className={idSet.has(r) ? "chip" : "chip bad"}
+                  onClick={() => removeRelated(r)}
+                  title={idSet.has(r) ? "Remove" : "Unknown note id — remove"}
+                >
+                  {idSet.has(r) ? "" : "⚠ "}
+                  {r} ✕
+                </button>
+              ))}
+            </div>
+          )}
+          <input
+            list="all-note-ids"
+            placeholder="Add related note id and press Enter"
+            value={relatedDraft}
+            onChange={(e) => setRelatedDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addRelated(relatedDraft);
+              }
+            }}
+          />
+          <datalist id="all-note-ids">
+            {noteIds.map((id) => (
+              <option key={id} value={id} />
+            ))}
+          </datalist>
         </div>
-        <input
-          list="all-note-ids"
-          placeholder="Add related note id, Enter"
-          value={relatedDraft}
-          onChange={(e) => setRelatedDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              addRelated(relatedDraft);
-            }
-          }}
-        />
-        <datalist id="all-note-ids">
-          {noteIds.map((id) => (
-            <option key={id} value={id} />
-          ))}
-        </datalist>
       </div>
 
       <AssetManager savedId={savedId} assetVer={assetVer} />
-
-      <label className="checkbox">
-        <input
-          type="checkbox"
-          checked={note.draft}
-          onChange={(e) => onChange({ draft: e.target.checked })}
-        />
-        <span>Draft (hidden from production build)</span>
-      </label>
     </div>
   );
 }
