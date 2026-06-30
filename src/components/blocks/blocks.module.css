@@ -94,6 +94,7 @@
   border-radius: var(--r-md);
   overflow: hidden;
   background: var(--bg);
+  max-width: 100%;
 }
 
 /* Header — always shown; shares code background so it blends (no contrasting bar). */
@@ -252,6 +253,7 @@
   overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
+  max-width: 100%;
 }
 
 .table {

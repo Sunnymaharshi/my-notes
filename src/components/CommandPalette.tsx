@@ -176,8 +176,22 @@ export function CommandPalette({ open, onOpenChange }: Props) {
           onValueChange={setQuery}
           placeholder="Search notes…"
           autoFocus
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          inputMode="search"
+          name="notes-search"
         />
         {searching && <span className={styles.spinner} aria-hidden="true" />}
+        <button
+          className={styles.closeBtn}
+          onClick={() => onOpenChange(false)}
+          aria-label="Close search"
+          type="button"
+        >
+          ✕
+        </button>
       </div>
 
       {showHits && hits.length > 0 && (

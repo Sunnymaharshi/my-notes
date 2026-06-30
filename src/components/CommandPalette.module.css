@@ -100,6 +100,27 @@
   color: var(--text-faint);
 }
 
+.closeBtn {
+  display: none;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .closeBtn {
+    display: flex;
+  }
+}
+
 .spinner {
   width: 14px;
   height: 14px;

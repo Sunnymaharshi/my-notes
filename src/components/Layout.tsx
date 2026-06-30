@@ -195,7 +195,7 @@ export function Layout() {
           {theme === "dark" ? "☀" : "☾"}
         </button>
       </Tooltip>
-      <main className={styles.main} ref={mainRef} onScroll={handleMainScroll}>
+      <main className={styles.main} ref={mainRef} onScroll={handleMainScroll} data-scroll-spy>
         <motion.div
           key={pathname}
           initial={{ opacity: 0, y: 8 }}
@@ -210,13 +210,15 @@ export function Layout() {
         style={{ transform: `scaleX(${scrollProgress})` }}
         aria-hidden="true"
       />
-      <button
-        className={styles.searchFab}
-        onClick={() => setPaletteOpen(true)}
-        aria-label="Search notes"
-      >
-        ⌕
-      </button>
+      {pathname !== "/" && (
+        <button
+          className={styles.searchFab}
+          onClick={() => setPaletteOpen(true)}
+          aria-label="Search notes"
+        >
+          ⌕
+        </button>
+      )}
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   );

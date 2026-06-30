@@ -1,7 +1,9 @@
 .shell {
   display: grid;
   grid-template-columns: var(--sidebar-w) 1fr;
-  height: 100vh;
+  /* dvh tracks the visual viewport as mobile URL bars show/hide;
+     falls back to vh on browsers that don't support it yet */
+  height: 100dvh;
 }
 
 .sidebar {
@@ -216,13 +218,16 @@
 .main {
   position: relative;
   overflow-y: auto;
+  overflow-x: hidden;
   scroll-behavior: smooth;
   padding: var(--sp-6) var(--sp-7) var(--sp-7);
+  min-width: 0;
 }
 
 @media (max-width: 860px) {
   .main {
-    padding: 64px var(--sp-4) var(--sp-6);
+    /* extra bottom padding clears the fixed search FAB (52px + 36px gap + buffer) */
+    padding: 64px var(--sp-4) 104px;
   }
 }
 
@@ -338,11 +343,11 @@
     display: grid;
     place-items: center;
     position: fixed;
-    bottom: 20px;
-    right: 16px;
+    bottom: 36px;
+    right: 24px;
     z-index: 40;
-    width: 48px;
-    height: 48px;
+    width: 52px;
+    height: 52px;
     background: var(--hl);
     border: none;
     border-radius: 50%;

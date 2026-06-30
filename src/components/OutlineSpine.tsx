@@ -47,81 +47,71 @@ export function OutlineSpine({ note, view }: { note: Note; view: string }) {
   const [active, setActive] = useState<string | null>(topics[0]?.path ?? null);
   const [copied, setCopied] = useState<string | null>(null);
   const copyTimer = useRef<number>();
+  // While a programmatic scroll is in flight, suppress scroll-spy updates so
+  // the dot doesn't bounce through intermediate sections on its way to the target.
+  const jumping = useRef(false);
+  const jumpTimer = useRef<number>();
 
-  // Scroll-spy: the active topic is the topmost one currently in the upper band
-  // of the viewport. Re-runs when the note or view changes (anchors remount).
+  // Scroll-spy: find the last topic anchor whose top edge is above 35% of the
+  // viewport height. This gives a stable "you are reading this section" signal
+  // without flickering when two headings are simultaneously near the top.
   useEffect(() => {
     if (topics.length === 0) return;
     setActive(topics[0].path);
-    const tops = new Map<string, number>();
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          const path = e.target.getAttribute("data-topic");
-          if (!path) continue;
-          if (e.isIntersecting) tops.set(path, e.boundingClientRect.top);
-          else tops.delete(path);
-        }
-        let best: string | null = null;
-        let bestTop = Infinity;
-        for (const [p, top] of tops) {
-          if (top < bestTop) {
-            bestTop = top;
-            best = p;
-          }
-        }
-        if (best) setActive(best);
-      },
-      { rootMargin: "-12% 0px -68% 0px", threshold: 0 },
-    );
-    for (const t of topics) {
-      const el = document.getElementById(nodeAnchorId(t.path));
-      if (el) {
-        el.setAttribute("data-topic", t.path);
-        io.observe(el);
+
+    const scroller = document.querySelector<HTMLElement>("[data-scroll-spy]");
+    const root = scroller ?? window;
+
+    const getActive = () => {
+      if (jumping.current) return;
+      const threshold = window.innerHeight * 0.35;
+      let current: string | null = topics[0].path;
+      for (const t of topics) {
+        const el = document.getElementById(nodeAnchorId(t.path));
+        if (!el) continue;
+        const top = el.getBoundingClientRect().top;
+        if (top <= threshold) current = t.path;
       }
-    }
-    return () => io.disconnect();
+      setActive(current);
+    };
+
+    let raf: number;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      // If a jump is in flight, reset the idle timer on every scroll event so
+      // the lock only lifts after scroll events actually stop arriving.
+      if (jumping.current) {
+        window.clearTimeout(jumpTimer.current);
+        jumpTimer.current = window.setTimeout(() => { jumping.current = false; }, 120);
+        return;
+      }
+      raf = requestAnimationFrame(getActive);
+    };
+
+    getActive();
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      root.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(raf);
+    };
   }, [topics, view, note.id]);
 
   const jump = (path: string) => {
     const el = document.getElementById(nodeAnchorId(path));
     if (!el) return;
+    // Lock the dot on the target immediately. The scroll listener will keep
+    // resetting the 120 ms idle timer until scrolling stops, then unlock.
+    jumping.current = true;
+    window.clearTimeout(jumpTimer.current);
+    jumpTimer.current = window.setTimeout(() => { jumping.current = false; }, 120);
+    setActive(path);
     el.scrollIntoView({ behavior: "smooth", block: "start" });
     el.classList.add(noteStyles.flash);
     window.setTimeout(() => el.classList.remove(noteStyles.flash), 1700);
-    setActive(path);
   };
 
-  // Step to the prev/next topic relative to the active one (clamped to the ends).
-  const activeIdx = topics.findIndex((t) => t.path === active);
-  const step = (delta: number) => {
-    const next = activeIdx + delta;
-    if (next >= 0 && next < topics.length) jump(topics[next].path);
-  };
+  useEffect(() => () => window.clearTimeout(jumpTimer.current), []);
 
-  // Keyboard: "[" / "]" walk topics — turning the note into a guided path.
-  useEffect(() => {
-    if (topics.length < 2) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const el = e.target;
-      if (
-        el instanceof HTMLElement &&
-        (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)
-      )
-        return;
-      if (e.key === "[") {
-        e.preventDefault();
-        step(-1);
-      } else if (e.key === "]") {
-        e.preventDefault();
-        step(1);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [activeIdx, topics]);
 
   const copyLink = (path: string) => {
     const url = `${location.origin}${location.pathname}#${nodeAnchorId(path)}`;
@@ -172,25 +162,6 @@ export function OutlineSpine({ note, view }: { note: Note; view: string }) {
           );
         })}
       </ul>
-      <div className={styles.steps}>
-        <button
-          className={styles.step}
-          onClick={() => step(-1)}
-          disabled={activeIdx <= 0}
-          aria-label="Previous topic"
-        >
-          ↑ Prev
-        </button>
-        <button
-          className={styles.step}
-          onClick={() => step(1)}
-          disabled={activeIdx < 0 || activeIdx >= topics.length - 1}
-          aria-label="Next topic"
-        >
-          Next ↓
-        </button>
-        <kbd className={styles.stepKbd}>[ ]</kbd>
-      </div>
     </nav>
   );
 }
